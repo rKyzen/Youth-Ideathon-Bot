@@ -1,0 +1,14 @@
+# Chrome user profile session data
+chrome_user_data/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Runtime logs
+automation.log
+
+# Temporary / OS files
+.DS_Store
+Thumbs.db

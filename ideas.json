@@ -1,0 +1,167 @@
+[
+  {
+    "id": "IDEA-01",
+    "title": "Smart Solar PV Self-Cleaning & Dust Detection Ring",
+    "origin": "I faced this problem",
+    "stage": "Early Prototyping Stage",
+    "projected_reach": "1,00,000",
+    "why_great": "It solves a problem faced by many people",
+    "theme": "Sustainability",
+    "irctc_theme": "",
+    "description": "An automated, water-free wiper frame using electrostatic micro-brushes and solar-powered edge rollers. Dust accumulation reduces solar panel efficiency by up to 30% in dusty climates; this system tracks light reduction using photo-sensors and initiates automated mechanical dusting during non-peak hours, increasing net clean energy output without wasting potable water."
+  },
+  {
+    "id": "IDEA-02",
+    "title": "Low-Cost Braille Dynamic Refreshable Tactile Display",
+    "origin": "I got this during a discussion with someone",
+    "stage": "Design Stage",
+    "projected_reach": "25,000",
+    "why_great": "It uses new technology",
+    "theme": "EdTech",
+    "irctc_theme": "",
+    "description": "A low-cost tactile reader replacing expensive piezoelectric Braille cells with magnetic latching micro-solenoids and 3D-printed cams. Connects over USB/Bluetooth to open-source educational e-readers, translating digital textbooks into tactile script in real-time, drastically reducing the cost barrier of digital literacy for visually impaired school students."
+  },
+  {
+    "id": "IDEA-03",
+    "title": "AI Edge Vision for Real-Time Railway Track Debris Warning",
+    "origin": "I read something like this in a book or internet",
+    "stage": "Idea Stage",
+    "projected_reach": "10,00,000",
+    "why_great": "It solves a problem that has been unsolved for ages",
+    "theme": "IRCTC challenge",
+    "irctc_theme": "IRCTC- One Stop Shop Travel Solution",
+    "description": "A solar-backed edge computing camera node for rail crossings and blind bends. Running lightweight YOLO vision models on local micro-NPUs, it detects fallen boulders, stalled vehicles, and wildlife intrusions within 300m, transmitting low-latency RF warning signals directly to locomotive telemetry and local signal boxes before visual range."
+  },
+  {
+    "id": "IDEA-04",
+    "title": "Decentralized Precision Compost Moisture & Aeration Monitor",
+    "origin": "I faced this problem",
+    "stage": "Early Prototyping Stage",
+    "projected_reach": "25,000",
+    "why_great": "It solves a problem faced by many people",
+    "theme": "Sustainability",
+    "irctc_theme": "",
+    "description": "A modular probe using soil-capacitance sensors and digital thermal arrays inserted into community and school composting pits. Powered by a small top-mounted solar cell, it logs organic decomposition health, sounding an alert and activating a simple passive vent damper when anaerobic conditions or methane spikes occur."
+  },
+  {
+    "id": "IDEA-05",
+    "title": "Biodegradable Plant-Wax Coated IRCTC Meal Trays",
+    "origin": "I faced this problem",
+    "stage": "Design Stage",
+    "projected_reach": "10,00,000",
+    "why_great": "It solves a problem faced by many people",
+    "theme": "IRCTC challenge",
+    "irctc_theme": "Innovation and Improvements in Railway Catering Services",
+    "description": "Agri-waste pressed bagasse food containers lined with natural edible candelilla/carnauba plant-wax emulsion to eliminate single-use plastic covers and non-recyclable multi-layer films in train catering. Trays withstand hot gravies up to 100\u00b0C without leakage and degrade into fertile compost within 45 days of railway disposal."
+  },
+  {
+    "id": "IDEA-06",
+    "title": "Edge-AI Non-Invasive Plant Disease Scanner for Smallholders",
+    "origin": "I read something like this in a book or internet",
+    "stage": "Early Prototyping Stage",
+    "projected_reach": "1,00,000",
+    "why_great": "It uses new technology",
+    "theme": "AI and Chip Innovation",
+    "irctc_theme": "",
+    "description": "A battery-powered handheld leaf spectrometer and camera running an INT8 quantized MobileNet on a RISC-V edge microcontroller. It provides instant offline disease identification and localized bio-remedy advice for marginal farmers without needing active 4G/5G mobile internet in rural fields."
+  },
+  {
+    "id": "IDEA-07",
+    "title": "Automated Railway Packaged Bottle Crushing & Reward Kiosk",
+    "origin": "I faced this problem",
+    "stage": "Prototype Validation Stage",
+    "projected_reach": "10,00,000",
+    "why_great": "It solves a problem faced by many people",
+    "theme": "IRCTC challenge",
+    "irctc_theme": "Packaged Drinking Water",
+    "description": "A high-torque mechanical shredder kiosk deployed on station platforms for Rail Neer bottles. Passengers scan their PNR or UPI QR code to deposit empty bottles, receiving instant refund coupons or digital travel points, ensuring 100% station plastic flaking while preventing illegal refilling and track littering."
+  },
+  {
+    "id": "IDEA-08",
+    "title": "Classroom Ambient Noise & Ventilation Feedback Node",
+    "origin": "I faced this problem",
+    "stage": "Prototype Validation Stage",
+    "projected_reach": "25,000",
+    "why_great": "It solves a problem faced by many people",
+    "theme": "EdTech",
+    "irctc_theme": "",
+    "description": "An interactive wall-mounted hardware gauge tracking CO2 levels, temperature, and decibel spikes in crowded classrooms. When ventilation drops or fatigue thresholds cross, a gentle ambient LED beacon alerts teachers to open windows and recalibrate group pacing, improving focus and air hygiene."
+  },
+  {
+    "id": "IDEA-09",
+    "title": "Sub-Orbital CanSat Atmosphere & Micro-Particulate Profiler",
+    "origin": "From my teacher or mentor",
+    "stage": "Early Prototyping Stage",
+    "projected_reach": "1,000",
+    "why_great": "It is very innovative",
+    "theme": "Space",
+    "irctc_theme": "",
+    "description": "A standardized 350g cylindrical payload module carrying laser PM2.5/PM10 sensors, barometric altimeters, and LoRa telemetry. Designed for weather balloons and sub-orbital amateur rocketry, it profiles vertical atmospheric particulate strata to validate ground satellite weather data."
+  },
+  {
+    "id": "IDEA-10",
+    "title": "Pothole Dynamic Mapping & Shock Absorption Logger",
+    "origin": "I faced this problem",
+    "stage": "Design Stage",
+    "projected_reach": "1,00,000",
+    "why_great": "It solves a problem faced by many people",
+    "theme": "Next Billion Innovation Challenge",
+    "irctc_theme": "",
+    "description": "A compact IMU-based vibration sensing collar mounted onto municipal bicycles and shared auto-rickshaws. Using passive wheel vibration analysis, it geotags road crater severity and uploads low-bandwidth telemetry over crowd-sourced BLE mesh, helping city works prioritize repair spots."
+  },
+  {
+    "id": "IDEA-11",
+    "title": "Smart Greywater Siphon for Multi-Story Household Flush",
+    "origin": "My family or close friends faced this problem",
+    "stage": "Idea Stage",
+    "projected_reach": "1,00,000",
+    "why_great": "It solves a problem faced by many people",
+    "theme": "Sustainability",
+    "irctc_theme": "",
+    "description": "A mechanical dual-valve diverter with active sand-mesh sedimentation installed beneath domestic washing machines. It filters soapy lint and routes rinse cycles into gravity cistern tanks for toilet flushing, saving over 4,000 liters of potable municipal water per urban household each month."
+  },
+  {
+    "id": "IDEA-12",
+    "title": "Emergency SOS Mesh Tracker for Women Commuters",
+    "origin": "I got this during a discussion with someone",
+    "stage": "Design Stage",
+    "projected_reach": "25,000",
+    "why_great": "It uses new technology",
+    "theme": "Supporting Girl Entrepreneurs",
+    "irctc_theme": "",
+    "description": "A discrete wearable pendant that triggers silent emergency alerts using 868MHz peer-to-peer LoRa mesh relays without needing phone cellular reception. Packets jump across transit vehicles and local hub beacons directly to registered emergency contact groups and nearest police dispatch points."
+  },
+  {
+    "id": "IDEA-13",
+    "title": "Dynamic Rail Berths & PNR Multi-Hop Routing Optimizer",
+    "origin": "I faced this problem",
+    "stage": "Idea Stage",
+    "projected_reach": "More than 10,00,000",
+    "why_great": "It solves a problem that has been unsolved for ages",
+    "theme": "IRCTC challenge",
+    "irctc_theme": "Think Ticketing, Think IRCTC",
+    "description": "An algorithmic graph search plugin that unifies vacant partial-leg sleeper berths across intermediate stops into single continuous journey tickets. Eliminates dead-leg empty seats while turning waitlisted passengers into confirmed split-berth travelers without requiring train-swapping delays."
+  },
+  {
+    "id": "IDEA-14",
+    "title": "Open Low-Cost FPGA Logic Trainer for High Schools",
+    "origin": "From my teacher or mentor",
+    "stage": "Early Prototyping Stage",
+    "projected_reach": "25,000",
+    "why_great": "It is very innovative",
+    "theme": "AI and Chip Innovation",
+    "irctc_theme": "",
+    "description": "A minimal, USB-C powered pedagogical FPGA development shield pairing an affordable open-silicon gate array with beginner-friendly drag-and-drop Verilog blocks. Introduces school students to digital logic, ALU synthesis, and hardware descriptor programming at one-fifth the cost of proprietary boards."
+  },
+  {
+    "id": "IDEA-15",
+    "title": "Offline Disaster Relief Micro-Exchange & SOS Bulletin",
+    "origin": "I read something like this in a book or internet",
+    "stage": "Idea Stage",
+    "projected_reach": "1,00,000",
+    "why_great": "It solves a problem that has been unsolved for ages",
+    "theme": "Open Innovation",
+    "irctc_theme": "",
+    "description": "A self-contained solar Wi-Fi hotspot box built on Raspberry Pi that boots an offline captive portal during flood and earthquake grid failures. Citizens connect to broadcast SOS requests, mark family survival status, and coordinate local food rations without any upstream internet connection."
+  }
+]
