@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Youth Ideathon 2026 - Automation Dashboard</title>
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#fff7ed',
+              500: '#f97316',
+              600: '#ea580c',
+              700: '#c2410c'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Custom scrollbar for console */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.4); }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased selection:bg-orange-500 selection:text-white">
+
+  <!-- Top Navigation Bar -->
+  <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="h-10 w-10 rounded-xl bg-gradient-to-tr from-orange-600 to-amber-500 flex items-center justify-center shadow-lg shadow-orange-500/20">
+          <i data-lucide="rocket" class="w-5 h-5 text-white"></i>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
+            Youth Ideathon Automation
+          </h1>
+          <p class="text-xs text-slate-400">Sequential Submission & Monitoring Console</p>
+        </div>
+      </div>
+
+      <!-- Header Status Badge & Controls -->
+      <div class="flex items-center gap-4">
+        <div id="statusBadge" class="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-800 text-slate-300 border border-slate-700">
+          <span class="w-2 h-2 rounded-full bg-slate-400 animate-pulse" id="statusDot"></span>
+          <span id="statusText">IDLE</span>
+        </div>
+
+        <button onclick="toggleTheme()" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition" title="Toggle Theme">
+          <i data-lucide="moon" class="w-4 h-4" id="themeIcon"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Dashboard -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+
+    <!-- Metrics & ETA Banner -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-4 flex items-center gap-4">
+        <div class="p-3 bg-blue-500/10 text-blue-400 rounded-lg"><i data-lucide="layers" class="w-6 h-6"></i></div>
+        <div>
+          <div class="text-xs font-medium text-slate-400">Total Ideas</div>
+          <div class="text-2xl font-bold text-white" id="statTotal">--</div>
+        </div>
+      </div>
+
+      <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-4 flex items-center gap-4">
+        <div class="p-3 bg-emerald-500/10 text-emerald-400 rounded-lg"><i data-lucide="check-circle" class="w-6 h-6"></i></div>
+        <div>
+          <div class="text-xs font-medium text-slate-400">Submitted / Success</div>
+          <div class="text-2xl font-bold text-emerald-400" id="statSuccess">--</div>
+        </div>
+      </div>
+
+      <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-4 flex items-center gap-4">
+        <div class="p-3 bg-amber-500/10 text-amber-400 rounded-lg"><i data-lucide="clock" class="w-6 h-6"></i></div>
+        <div>
+          <div class="text-xs font-medium text-slate-400">Est. Time Remaining</div>
+          <div class="text-2xl font-bold text-amber-400" id="statEta">--</div>
+        </div>
+      </div>
+
+      <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-4 flex items-center gap-4">
+        <div class="p-3 bg-purple-500/10 text-purple-400 rounded-lg"><i data-lucide="shield-check" class="w-6 h-6"></i></div>
+        <div>
+          <div class="text-xs font-medium text-slate-400">Target Finish Time</div>
+          <div class="text-2xl font-bold text-purple-400" id="statFinish">--</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Active Progress Bar -->
+    <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm space-y-2">
+      <div class="flex justify-between items-center text-sm">
+        <span class="font-medium text-slate-300 flex items-center gap-2">
+          <i data-lucide="activity" class="w-4 h-4 text-orange-500"></i>
+          <span id="progressLabel">Ready to begin</span>
+        </span>
+        <span class="font-mono font-semibold text-orange-400" id="progressPercent">0%</span>
+      </div>
+      <div class="w-full bg-slate-800 rounded-full h-3 overflow-hidden">
+        <div id="progressBar" class="bg-gradient-to-r from-orange-500 to-amber-500 h-3 rounded-full transition-all duration-500 ease-out" style="width: 0%"></div>
+      </div>
+    </div>
+
+    <!-- Primary Layout: Left Control Panel | Right Monitor -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+      <!-- LEFT COLUMN: Configuration, AI Generator, Controls (5 cols) -->
+      <div class="lg:col-span-5 space-y-6">
+
+        <!-- Form Configuration Card -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-5">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+            <h2 class="text-base font-semibold text-white flex items-center gap-2">
+              <i data-lucide="sliders" class="w-4 h-4 text-orange-500"></i>
+              Submission Configuration
+            </h2>
+            <span class="text-xs text-slate-400">Portal Parameters</span>
+          </div>
+
+          <div class="space-y-4">
+            <!-- Participation Type Toggle -->
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1.5">Participation Type</label>
+              <div class="grid grid-cols-2 gap-2">
+                <button type="button" id="btnTypeTeam" onclick="setParticipationType('Team')" class="py-2 px-3 text-xs font-medium rounded-lg border transition border-orange-500/50 bg-orange-500/10 text-orange-400">
+                  <i data-lucide="users" class="w-3.5 h-3.5 inline mr-1"></i> Team
+                </button>
+                <button type="button" id="btnTypeIndiv" onclick="setParticipationType('Individual')" class="py-2 px-3 text-xs font-medium rounded-lg border transition border-slate-700 bg-slate-800 text-slate-400">
+                  <i data-lucide="user" class="w-3.5 h-3.5 inline mr-1"></i> Individual
+                </button>
+              </div>
+            </div>
+
+            <!-- Primary SID -->
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">
+                Primary Student ID (SID 1) <span class="text-rose-400">*</span>
+              </label>
+              <input type="text" id="cfgPrimarySid" value="YI26-11860" class="w-full bg-slate-800/80 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500">
+            </div>
+
+            <!-- Teammate SIDs (Conditional) -->
+            <div id="teamSidFields" class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Teammate 1 (SID 2)</label>
+                <input type="text" id="cfgSid2" value="YI26-08461" class="w-full bg-slate-800/80 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500">
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Teammate 2 (SID 3)</label>
+                <input type="text" id="cfgSid3" value="YI26-09892" class="w-full bg-slate-800/80 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500">
+              </div>
+            </div>
+
+            <!-- Target Mentor -->
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">
+                Target Mentor Name (Exact Detail) <span class="text-rose-400">*</span>
+              </label>
+              <input type="text" id="cfgMentor" value="Umesh Verma (ATL)" class="w-full bg-slate-800/80 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500">
+              <p class="text-[11px] text-slate-400 mt-1">Dynamically selected once SID loads mentor options.</p>
+            </div>
+
+            <!-- Idea Markdown File Location -->
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">
+                Idea Markdown File Path
+              </label>
+              <div class="flex gap-2">
+                <input type="text" id="cfgFilePath" value="Idea.md" class="flex-1 bg-slate-800/80 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500">
+                <button type="button" onclick="reloadIdeas()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-xs font-medium text-slate-300 transition" title="Reload File">
+                  <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Execution Action Buttons -->
+          <div class="pt-3 border-t border-slate-800 flex flex-col gap-2.5">
+            <button type="button" id="btnStartSubmit" onclick="startSubmission(false)" class="w-full py-3 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-bold rounded-xl shadow-lg shadow-orange-600/20 flex items-center justify-center gap-2 transition disabled:opacity-50">
+              <i data-lucide="play" class="w-4 h-4 fill-white"></i> Start Full Submission
+            </button>
+            <div class="grid grid-cols-2 gap-2">
+              <button type="button" id="btnStartDryRun" onclick="startSubmission(true)" class="py-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-medium text-xs rounded-xl flex items-center justify-center gap-1.5 transition disabled:opacity-50">
+                <i data-lucide="check-square" class="w-4 h-4 text-amber-400"></i> Run Dry-Run Test
+              </button>
+              <button type="button" id="btnStop" onclick="stopSubmission()" disabled class="py-2.5 bg-rose-950/40 hover:bg-rose-900/50 border border-rose-800/50 text-rose-300 font-medium text-xs rounded-xl flex items-center justify-center gap-1.5 transition disabled:opacity-30">
+                <i data-lucide="square" class="w-4 h-4"></i> Stop Execution
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- AI Idea Generator Prompt Box -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+            <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+              <i data-lucide="sparkles" class="w-4 h-4 text-amber-400"></i>
+              AI Prompt Generator
+            </h3>
+            <span class="text-xs text-amber-400/90 font-medium bg-amber-500/10 px-2 py-0.5 rounded">Prompt Builder</span>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-slate-400 mb-1.5">Select Innovation Domain</label>
+            <select id="selDomain" onchange="updatePrompt()" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500">
+              <option value="electronics">1. Electronic & Hardware (IoT, Sensors, Microcontrollers)</option>
+              <option value="software">2. Software & AI (Web, Mobile Apps, Machine Learning)</option>
+              <option value="mixed" selected>3. Mixed / Hybrid (IoT Hardware + Cloud Software / DeepTech)</option>
+            </select>
+          </div>
+
+          <div class="relative">
+            <textarea id="txtPrompt" readonly rows="7" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-xs font-mono text-slate-300 focus:outline-none resize-none"></textarea>
+            <button onclick="copyPrompt()" class="absolute top-2 right-2 px-2.5 py-1 bg-orange-600 hover:bg-orange-500 text-white rounded text-xs font-medium flex items-center gap-1 shadow transition">
+              <i data-lucide="copy" class="w-3.5 h-3.5"></i> <span id="copyPromptLabel">Copy</span>
+            </button>
+          </div>
+          <p class="text-[11px] text-slate-400">Copy & paste this prompt into ChatGPT, Claude, or Gemini to create an exact-fit <code class="text-orange-400">Idea.md</code> file.</p>
+        </div>
+
+      </div>
+
+      <!-- RIGHT COLUMN: Console Logs & Live Evidence (7 cols) -->
+      <div class="lg:col-span-7 space-y-6">
+
+        <!-- Tab Controls: Live Logs vs Idea Catalog vs Evidence -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden flex flex-col h-[760px]">
+          <div class="flex items-center justify-between px-4 border-b border-slate-800 bg-slate-900/90">
+            <div class="flex gap-2">
+              <button onclick="switchTab('tabLogs')" id="btnTabLogs" class="py-3 px-4 text-xs font-bold border-b-2 border-orange-500 text-orange-400 flex items-center gap-1.5">
+                <i data-lucide="terminal" class="w-4 h-4"></i> Live Console
+              </button>
+              <button onclick="switchTab('tabCatalog')" id="btnTabCatalog" class="py-3 px-4 text-xs font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-1.5">
+                <i data-lucide="file-text" class="w-4 h-4"></i> Idea Catalog (<span id="tabIdeaCount">0</span>)
+              </button>
+              <button onclick="switchTab('tabEvidence')" id="btnTabEvidence" class="py-3 px-4 text-xs font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-1.5">
+                <i data-lucide="image" class="w-4 h-4"></i> Screenshot Evidence
+              </button>
+            </div>
+            <div class="flex items-center gap-2">
+              <button onclick="clearConsole()" class="text-slate-400 hover:text-slate-200 p-1.5 rounded transition" title="Clear Console">
+                <i data-lucide="trash-2" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- TAB 1: Live Console Stream -->
+          <div id="tabLogs" class="flex-1 p-4 bg-slate-950 font-mono text-xs overflow-y-auto flex flex-col space-y-1">
+            <div class="text-slate-500">// Youth Ideathon Console initialized. Ready for command.</div>
+          </div>
+
+          <!-- TAB 2: Idea Catalog Viewer & Editor -->
+          <div id="tabCatalog" class="flex-1 p-4 overflow-y-auto hidden space-y-4">
+            <div class="flex justify-between items-center mb-2">
+              <h4 class="text-xs font-bold text-slate-300">Parsed Ideas in Current File</h4>
+              <button onclick="saveIdeaCatalog()" class="px-3 py-1 bg-orange-600 hover:bg-orange-500 text-white rounded text-xs font-medium flex items-center gap-1">
+                <i data-lucide="save" class="w-3.5 h-3.5"></i> Save Changes
+              </button>
+            </div>
+            <!-- Raw Editor -->
+            <textarea id="txtIdeaContent" rows="12" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 font-mono text-xs text-slate-200 focus:outline-none"></textarea>
+            
+            <!-- Parsed Cards List -->
+            <div id="parsedIdeasGrid" class="space-y-3">
+              <!-- Rendered via JS -->
+            </div>
+          </div>
+
+          <!-- TAB 3: Screenshot Evidence Gallery -->
+          <div id="tabEvidence" class="flex-1 p-4 overflow-y-auto hidden">
+            <div class="flex justify-between items-center mb-4">
+              <span class="text-xs text-slate-400">Captured Playwright Full-Page Proofs</span>
+              <button onclick="loadScreenshots()" class="text-xs text-orange-400 hover:underline flex items-center gap-1">
+                <i data-lucide="refresh-cw" class="w-3 h-3"></i> Refresh
+              </button>
+            </div>
+            <div id="galleryGrid" class="grid grid-cols-2 gap-4">
+              <!-- Rendered via JS -->
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- Image Modal Viewer -->
+  <div id="imgModal" class="fixed inset-0 bg-black/90 z-50 hidden flex items-center justify-center p-4 backdrop-blur-sm" onclick="closeModal()">
+    <div class="max-w-5xl max-h-[90vh] bg-slate-900 border border-slate-800 rounded-xl overflow-hidden p-2 relative" onclick="event.stopPropagation()">
+      <button onclick="closeModal()" class="absolute top-4 right-4 p-2 bg-slate-800/80 hover:bg-slate-700 text-white rounded-full">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+      <img id="modalImg" src="" alt="Screenshot" class="max-h-[85vh] w-auto mx-auto object-contain rounded-lg">
+      <div id="modalCaption" class="text-center text-xs text-slate-300 mt-2 font-mono"></div>
+    </div>
+  </div>
+
+  <footer class="border-t border-slate-800 bg-slate-900/60 py-4 text-center text-xs text-slate-400">
+    Youth Ideathon 2026 Batch Automation Pipeline • Running on Localhost
+  </footer>
+
+  <!-- Frontend Client Logic -->
+  <script>
+    let currentTab = 'tabLogs';
+    let participationType = 'Team';
+    let sseSource = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      updatePrompt();
+      loadInitialData();
+      connectEventStream();
+    });
+
+    function toggleTheme() {
+      document.documentElement.classList.toggle('dark');
+    }
+
+    function switchTab(tabId) {
+      document.getElementById('tabLogs').classList.add('hidden');
+      document.getElementById('tabCatalog').classList.add('hidden');
+      document.getElementById('tabEvidence').classList.add('hidden');
+
+      document.getElementById('btnTabLogs').className = 'py-3 px-4 text-xs font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-1.5';
+      document.getElementById('btnTabCatalog').className = 'py-3 px-4 text-xs font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-1.5';
+      document.getElementById('btnTabEvidence').className = 'py-3 px-4 text-xs font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-1.5';
+
+      document.getElementById(tabId).classList.remove('hidden');
+      if (tabId === 'tabLogs') {
+        document.getElementById('btnTabLogs').className = 'py-3 px-4 text-xs font-bold border-b-2 border-orange-500 text-orange-400 flex items-center gap-1.5';
+      } else if (tabId === 'tabCatalog') {
+        document.getElementById('btnTabCatalog').className = 'py-3 px-4 text-xs font-bold border-b-2 border-orange-500 text-orange-400 flex items-center gap-1.5';
+        loadRawCatalog();
+      } else if (tabId === 'tabEvidence') {
+        document.getElementById('btnTabEvidence').className = 'py-3 px-4 text-xs font-bold border-b-2 border-orange-500 text-orange-400 flex items-center gap-1.5';
+        loadScreenshots();
+      }
+      lucide.createIcons();
+    }
+
+    function setParticipationType(type) {
+      participationType = type;
+      const btnTeam = document.getElementById('btnTypeTeam');
+      const btnIndiv = document.getElementById('btnTypeIndiv');
+      const teamSidFields = document.getElementById('teamSidFields');
+
+      if (type === 'Team') {
+        btnTeam.className = 'py-2 px-3 text-xs font-medium rounded-lg border transition border-orange-500/50 bg-orange-500/10 text-orange-400';
+        btnIndiv.className = 'py-2 px-3 text-xs font-medium rounded-lg border transition border-slate-700 bg-slate-800 text-slate-400';
+        teamSidFields.style.display = 'grid';
+      } else {
+        btnIndiv.className = 'py-2 px-3 text-xs font-medium rounded-lg border transition border-orange-500/50 bg-orange-500/10 text-orange-400';
+        btnTeam.className = 'py-2 px-3 text-xs font-medium rounded-lg border transition border-slate-700 bg-slate-800 text-slate-400';
+        teamSidFields.style.display = 'none';
+      }
+      lucide.createIcons();
+    }
+
+    async function loadInitialData() {
+      try {
+        const res = await fetch('/api/ideas');
+        const data = await res.json();
+        document.getElementById('statTotal').innerText = data.ideas.length;
+        document.getElementById('tabIdeaCount').innerText = data.ideas.length;
+        renderIdeaCards(data.ideas);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function renderIdeaCards(ideas) {
+      const grid = document.getElementById('parsedIdeasGrid');
+      grid.innerHTML = '';
+      ideas.forEach(idea => {
+        const charCount = idea.description ? idea.description.length : 0;
+        const validBadge = charCount <= 500 
+          ? `<span class="text-[11px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-mono">${charCount}/500 chars (Valid)</span>`
+          : `<span class="text-[11px] px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/30 font-mono font-bold">${charCount}/500 chars (OVER LIMIT!)</span>`;
+
+        const card = document.createElement('div');
+        card.className = 'p-3 bg-slate-900 border border-slate-800 rounded-lg space-y-1.5';
+        card.innerHTML = `
+          <div class="flex justify-between items-start">
+            <span class="text-xs font-bold text-orange-400">${idea.id}</span>
+            ${validBadge}
+          </div>
+          <div class="text-sm font-semibold text-white">${idea.title}</div>
+          <div class="text-xs text-slate-400 flex flex-wrap gap-2">
+            <span><strong>Theme:</strong> ${idea.theme}${idea.irctc_theme ? ' (' + idea.irctc_theme + ')' : ''}</span>
+            <span>•</span>
+            <span><strong>Stage:</strong> ${idea.stage}</span>
+            <span>•</span>
+            <span><strong>Reach:</strong> ${idea.projected_reach}</span>
+          </div>
+          <div class="text-xs text-slate-300 font-mono bg-slate-950 p-2 rounded line-clamp-2">${idea.description}</div>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    async function loadRawCatalog() {
+      try {
+        const res = await fetch('/api/raw-idea-file');
+        const data = await res.json();
+        document.getElementById('txtIdeaContent').value = data.content || '';
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function saveIdeaCatalog() {
+      try {
+        const content = document.getElementById('txtIdeaContent').value;
+        const res = await fetch('/api/raw-idea-file', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content })
+        });
+        if (res.ok) {
+          alert('Idea catalog updated successfully!');
+          loadInitialData();
+        }
+      } catch (e) {
+        alert('Failed to save catalog');
+      }
+    }
+
+    async function updatePrompt() {
+      const domainKey = document.getElementById('selDomain').value;
+      const res = await fetch(`/api/prompt?domain=${domainKey}`);
+      const data = await res.json();
+      document.getElementById('txtPrompt').value = data.prompt;
+    }
+
+    function copyPrompt() {
+      const txt = document.getElementById('txtPrompt').value;
+      navigator.clipboard.writeText(txt);
+      const label = document.getElementById('copyPromptLabel');
+      label.innerText = 'Copied!';
+      setTimeout(() => label.innerText = 'Copy', 2000);
+    }
+
+    async function startSubmission(isDryRun) {
+      const config = {
+        participation_type: participationType,
+        primary_sid: document.getElementById('cfgPrimarySid').value.trim(),
+        teammate_1_sid: document.getElementById('cfgSid2').value.trim(),
+        teammate_2_sid: document.getElementById('cfgSid3').value.trim(),
+        mentor_target: document.getElementById('cfgMentor').value.trim(),
+        data_file: document.getElementById('cfgFilePath').value.trim(),
+        dry_run: isDryRun
+      };
+
+      if (!config.primary_sid) {
+        alert('Please provide Primary Student ID (SID 1).');
+        return;
+      }
+
+      document.getElementById('btnStartSubmit').disabled = true;
+      document.getElementById('btnStartDryRun').disabled = true;
+      document.getElementById('btnStop').disabled = false;
+
+      appendLog(`[SYSTEM] Triggered ${isDryRun ? 'DRY-RUN' : 'LIVE'} submission process...`);
+
+      try {
+        const res = await fetch('/api/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(config)
+        });
+        const data = await res.json();
+        if (!data.success) {
+          alert('Could not start: ' + data.error);
+          resetButtons();
+        }
+      } catch (e) {
+        alert('Error starting execution');
+        resetButtons();
+      }
+    }
+
+    async function stopSubmission() {
+      try {
+        await fetch('/api/stop', { method: 'POST' });
+        appendLog('[SYSTEM] Execution cancellation requested.');
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function resetButtons() {
+      document.getElementById('btnStartSubmit').disabled = false;
+      document.getElementById('btnStartDryRun').disabled = false;
+      document.getElementById('btnStop').disabled = true;
+    }
+
+    function connectEventStream() {
+      if (sseSource) sseSource.close();
+      sseSource = new EventSource('/api/stream');
+
+      sseSource.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+
+          if (payload.type === 'log') {
+            appendLog(payload.message);
+          } else if (payload.type === 'status') {
+            updateDashboardStatus(payload);
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      };
+
+      sseSource.onerror = () => {
+        setTimeout(connectEventStream, 3000);
+      };
+    }
+
+    function updateDashboardStatus(state) {
+      document.getElementById('statusText').innerText = state.status.toUpperCase();
+      const dot = document.getElementById('statusDot');
+
+      if (state.status === 'running') {
+        dot.className = 'w-2 h-2 rounded-full bg-amber-400 animate-ping';
+        document.getElementById('statusBadge').className = 'flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/30';
+      } else if (state.status === 'completed') {
+        dot.className = 'w-2 h-2 rounded-full bg-emerald-400';
+        document.getElementById('statusBadge').className = 'flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30';
+        resetButtons();
+      } else {
+        dot.className = 'w-2 h-2 rounded-full bg-slate-400';
+        document.getElementById('statusBadge').className = 'flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-800 text-slate-300 border border-slate-700';
+        resetButtons();
+      }
+
+      document.getElementById('statTotal').innerText = state.total_ideas || '--';
+      document.getElementById('statSuccess').innerText = state.completed_ideas || '0';
+      document.getElementById('statEta').innerText = state.eta_str || '--';
+      document.getElementById('statFinish').innerText = state.finish_clock || '--';
+
+      const pct = state.total_ideas > 0 ? Math.round((state.completed_ideas / state.total_ideas) * 100) : 0;
+      document.getElementById('progressPercent').innerText = `${pct}%`;
+      document.getElementById('progressBar').style.width = `${pct}%`;
+      document.getElementById('progressLabel').innerText = state.current_idea_text || 'Idle';
+    }
+
+    function appendLog(line) {
+      const container = document.getElementById('tabLogs');
+      const div = document.createElement('div');
+      
+      if (line.includes('[ETA]') || line.includes('Remaining')) {
+        div.className = 'text-amber-400 font-semibold';
+      } else if (line.includes('SUCCESS') || line.includes('Finished') || line.includes('Completed')) {
+        div.className = 'text-emerald-400 font-semibold';
+      } else if (line.includes('FAILED') || line.includes('Error') || line.includes('Validation Failed')) {
+        div.className = 'text-rose-400 font-bold';
+      } else if (line.includes('DRY_RUN')) {
+        div.className = 'text-blue-400 font-medium';
+      } else {
+        div.className = 'text-slate-300';
+      }
+
+      div.innerText = line;
+      container.appendChild(div);
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function clearConsole() {
+      document.getElementById('tabLogs').innerHTML = '<div class="text-slate-500">// Console cleared.</div>';
+    }
+
+    async function loadScreenshots() {
+      try {
+        const res = await fetch('/api/screenshots');
+        const data = await res.json();
+        const gallery = document.getElementById('galleryGrid');
+        gallery.innerHTML = '';
+
+        if (!data.screenshots || data.screenshots.length === 0) {
+          gallery.innerHTML = '<div class="col-span-2 text-center text-xs text-slate-500 py-8">No screenshots captured yet.</div>';
+          return;
+        }
+
+        data.screenshots.forEach(shot => {
+          const div = document.createElement('div');
+          div.className = 'group relative rounded-lg border border-slate-800 bg-slate-950 overflow-hidden cursor-pointer hover:border-orange-500 transition';
+          div.onclick = () => openModal(shot.url, shot.name);
+          div.innerHTML = `
+            <img src="${shot.url}" class="h-36 w-full object-cover object-top opacity-80 group-hover:opacity-100 transition">
+            <div class="p-2 text-[11px] font-mono text-slate-300 truncate">${shot.name}</div>
+          `;
+          gallery.appendChild(div);
+        });
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function openModal(src, caption) {
+      document.getElementById('modalImg').src = src;
+      document.getElementById('modalCaption').innerText = caption;
+      document.getElementById('imgModal').classList.remove('hidden');
+    }
+
+    function closeModal() {
+      document.getElementById('imgModal').classList.add('hidden');
+    }
+  </script>
+</body>
+</html>

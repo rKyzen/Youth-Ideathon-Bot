@@ -1,34 +1,37 @@
-# 🚀 Youth Ideathon Automated Idea Submission Bot
+# 🚀 Youth Ideathon Automated Idea Submission Bot & Web Dashboard
 
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python Version" />
   <img src="https://img.shields.io/badge/Playwright-Automation-2EAD33?style=for-the-badge&logo=playwright&logoColor=white" alt="Playwright" />
+  <img src="https://img.shields.io/badge/FastAPI-Local%20Web%20GUI-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI" />
   <img src="https://img.shields.io/badge/Browser-Google%20Chrome-4285F4?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Chrome" />
   <img src="https://img.shields.io/badge/Platform-Youth%20Ideathon-FF5722?style=for-the-badge" alt="Youth Ideathon" />
   <img src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge" alt="License" />
 </p>
 
-An intelligent, resilient, and human-like automation pipeline built with **Playwright Python** to sequentially batch-submit innovation proposals to the [Youth Ideathon Portal](https://youthideathon.in/submit-your-idea/).
+An intelligent, resilient, and human-like automation pipeline and **local web GUI dashboard** built with **Playwright Python** and **FastAPI** to sequentially batch-submit innovation proposals to the [Youth Ideathon Portal](https://youthideathon.in/submit-your-idea/).
 
-Includes **interactive startup prompts**, **idea domain selector**, **built-in AI agent prompt generator**, **real-time completion time estimation (ETA)**, native **Markdown (`Idea.md`) parsing**, **dynamic AJAX mentor lookup**, **Cloudflare Turnstile bypass**, **character validation**, and **automatic screenshot auditing**.
+Includes a **modern Web UI on `http://localhost:8000`**, **live terminal log streaming**, **real-time ETA countdown**, **in-browser idea editor**, **AI agent prompt generator**, **dynamic AJAX mentor lookup**, **Cloudflare Turnstile bypass**, and **full-page screenshot auditing**.
 
 ---
 
 ## 📑 Table of Contents
+- [Local Web GUI Dashboard](#-local-web-gui-dashboard-localhost8000)
 - [Key Features](#-key-features)
 - [Workflow Architecture](#-workflow-architecture)
-- [Interactive Startup Wizard & AI Prompt Generator](#-interactive-startup-wizard--ai-prompt-generator)
+- [Project Structure](#-project-structure)
+- [Prerequisites & Installation](#-prerequisites--installation)
+- [Quick Start](#-quick-start)
+  - [1. Launch Web Dashboard (Recommended)](#1-launch-web-dashboard-recommended)
+  - [2. Terminal Interactive Mode](#2-terminal-interactive-mode)
+  - [3. Dry-Run Mode (Safe Verification)](#3-dry-run-mode-safe-verification)
+  - [4. Non-Interactive CLI Mode](#4-non-interactive-cli-mode)
 - [AI Agent Prompt to Generate `Idea.md`](#-ai-agent-prompt-to-generate-ideamd)
 - [Idea Catalog Format (`Idea.md`)](#-idea-catalog-format-ideamd)
   - [Standard Idea Template](#standard-idea-template)
   - [IRCTC Challenge Theme Template](#irctc-challenge-theme-template)
   - [Allowed Form Field Values](#allowed-form-field-values)
 - [Estimated Completion Time (ETA)](#-estimated-completion-time-eta)
-- [Quick Start](#-quick-start)
-  - [1. Interactive Mode (Default)](#1-interactive-mode-default)
-  - [2. Dry-Run Mode (Safe Verification)](#2-dry-run-mode-safe-verification)
-  - [3. Non-Interactive CLI Mode](#3-non-interactive-cli-mode)
-  - [4. Targeted Single-Idea Run](#4-targeted-single-idea-run)
 - [CLI Reference](#-cli-reference)
 - [Audit Logging & Evidence](#-audit-logging--evidence)
 - [Cloudflare Bypass Mechanism](#-cloudflare-bypass-mechanism)
@@ -36,23 +39,42 @@ Includes **interactive startup prompts**, **idea domain selector**, **built-in A
 
 ---
 
+## 🖥️ Local Web GUI Dashboard (`localhost:8000`)
+
+Run one command to launch the full-featured web console:
+
+```powershell
+python app.py
+```
+
+The browser opens automatically to **`http://localhost:8000`**, featuring:
+- **Dashboard Stats**: Real-time cards for total ideas, submitted count, ETA remaining, and target finish time.
+- **Dynamic Configuration Form**: Toggle *Team* vs *Individual*, edit Primary SID, Teammate SIDs, target Mentor, and catalog path.
+- **AI Prompt Generator**: Choose your domain (*Electronics*, *Software*, *Mixed*), preview the custom prompt, and click **"Copy"** to paste into ChatGPT, Claude, or Gemini.
+- **In-Browser Markdown Editor**: Edit and validate [`Idea.md`](Idea.md) directly on the web with instant character length validation.
+- **Real-time Live Console**: Server-Sent Events (SSE) stream terminal logs live into an autoscrolling dark-mode console.
+- **Screenshot Proof Gallery**: Visual grid of all captured full-page screenshots with click-to-zoom modal preview.
+- **Dual Controls**: One-click **"Start Full Submission"** and **"Run Dry-Run Test"** buttons with live cancellation.
+
+---
+
 ## 🌟 Key Features
 
-- **Interactive Startup Wizard**: On launch, interactively configures participation type (*Team* or *Individual*), SIDs, exact mentor string, idea domain, and file location.
-- **Built-in AI Idea Generator Prompt**: Select your domain (*Electronics*, *Software*, or *Mix*), and the CLI outputs an optimized prompt ready to paste into ChatGPT, Claude, or Gemini to generate your `Idea.md`.
-- **Dynamic File Locator**: Prompts you to specify or locate your custom `Idea.md` path on disk with validation.
-- **Estimated Completion Time (ETA)**: Calculates batch ETA upfront based on delay parameters and dynamically reports remaining time and target finish time after every submission.
-- **Direct Submissions (No Skipping)**: By default, submits all ideas present in the catalog file without arbitrary skipping.
-- **Native Markdown Parser (`Idea.md`)**: Write and review ideas in formatted Markdown. Supports standard themes, IRCTC sub-themes, and custom blockquotes.
-- **Dynamic AJAX Mentor Resolution**: Inputs primary SID (`YI26-11860`) and dispatches native `blur`/`change` events to trigger the portal's AJAX lookup (`action: yi26_get_mentors_by_sid`), automatically polling until the mentor option loads.
+- **Web GUI & Terminal Interfaces**: Choose between a rich local web interface or interactive command-line prompts.
+- **Built-in AI Idea Generator**: Select your domain, and the tool outputs an optimized prompt ready to paste into ChatGPT, Claude, or Gemini to generate `Idea.md`.
+- **Dynamic File Locator**: Browse or specify custom idea files on disk with validation.
+- **Estimated Completion Time (ETA)**: Calculates batch ETA upfront and dynamically updates countdown and clock finish time after every submission.
+- **Direct Sequential Submission**: Submits all ideas present in the catalog file sequentially without arbitrary skipping.
+- **Native Markdown Parser (`Idea.md`)**: Full support for standard themes, IRCTC sub-themes, and blockquotes.
+- **Dynamic AJAX Mentor Resolution**: Types Primary SID (`YI26-11860`) and dispatches `blur`/`change` events to trigger the portal's AJAX lookup (`action: yi26_get_mentors_by_sid`), automatically polling until the mentor option loads.
 - **Dynamic Dropdown Handler**: Accurately selects options across origin, stage, projected reach, why great, main theme, and conditional IRCTC sub-themes.
-- **Strict Pre-Validation**: Verifies idea descriptions are strictly $\le 500$ characters before launching or touching the browser, preventing portal rejections.
+- **Strict Pre-Validation**: Verifies idea descriptions are strictly $\le 500$ characters before launching the browser.
 - **Undetectable Cloudflare Clearance**: Leverages persistent browser profiles with stealth flags (`--disable-blink-features=AutomationControlled`) to pass Cloudflare Turnstile verification.
 - **Human-Like Pacing**:
   - $1.0\text{s} - 3.0\text{s}$ randomized pause between field inputs.
-  - $8.0\text{s} - 12.0\text{s}$ randomized cooldown between idea submissions.
+  - $8.0\text{s} - 12.0\text{s}$ randomized cooldown between submissions.
 - **Fault-Tolerant Retries**: Retries failed attempts once with diagnostic error screenshots without crashing the batch run.
-- **Audit Trails & Screenshots**: Captures pre-submission, dry-run, and confirmation screenshots for every idea into the `screenshots/` directory.
+- **Audit Trails & Evidence**: Captures full-page screenshots for every idea into the `screenshots/` directory and logs to [`submission_log.csv`](submission_log.csv).
 
 ---
 
@@ -60,13 +82,14 @@ Includes **interactive startup prompts**, **idea domain selector**, **built-in A
 
 ```mermaid
 flowchart TD
-    A([Start: submit_ideas.py]) --> B[Interactive Configuration Wizard\nTeam/Indiv, SID 1/2/3, Mentor]
-    B --> C[Select Idea Domain: Electronics / Software / Mix]
-    C --> D[Display AI Agent Prompt for Idea.md]
-    D --> E[Locate Idea.md File Path]
-    E --> F[Calculate Initial ETA Duration]
+    A([Launch: python app.py / submit_ideas.py]) --> B{GUI or Terminal?}
+    B -- Web GUI --> C[Open http://localhost:8000\nConfigure via Web Form]
+    B -- Terminal --> D[Interactive Terminal Prompts\nTeam/Indiv, SIDs, Mentor]
+    C --> E[Select Domain & Copy AI Prompt for Idea.md]
+    D --> E
+    E --> F[Load Idea.md & Compute ETA Upfront]
     F --> G{More ideas to submit?}
-    G -- No --> Z([Batch Complete! Print Total Time])
+    G -- No --> Z([Batch Complete!])
     G -- Yes --> H[Select Next Idea]
     H --> I{Description <= 500 chars?}
     I -- No --> J[Log VALIDATION_ERROR\nSkip browser interaction]
@@ -90,44 +113,78 @@ flowchart TD
 
 ---
 
-## 💻 Interactive Startup Wizard & AI Prompt Generator
-
-When launching `python submit_ideas.py`:
+## 📂 Project Structure
 
 ```text
-==============================================================
-      YOUTH IDEATHON 2026 - SUBMISSION CONFIGURATION
-==============================================================
-Press [Enter] to accept the suggested default value in [brackets].
+Youth-Ideathon-Bot/
+├── app.py                # FastAPI local web GUI server
+├── templates/
+│   └── index.html        # Modern Tailwind CSS dashboard
+├── Idea.md               # Primary idea catalog in clean Markdown
+├── ideas.json            # JSON export of ideas catalog
+├── ideas.csv             # CSV export of ideas catalog
+├── submit_ideas.py       # Core Playwright automation & CLI engine
+├── submission_log.csv    # Audit log recording timestamps, statuses & proof paths
+├── screenshots/          # Full-page verification & confirmation screenshots
+├── .gitignore            # Git exclusion rules (Chrome profiles, logs)
+└── README.md             # Project documentation
+```
 
-1. Participation Type (Team / Individual) [Team]: 
-2. SID 1 (Primary Student ID) [YI26-11860]: 
-3. SID 2 (Teammate 1 SID) [YI26-08461]: 
-4. SID 3 (Teammate 2 SID) [YI26-09892]: 
-5. Mentor Name (exact detail, e.g. Name (Stream)) [Umesh Verma (ATL)]: 
+---
 
---- Idea Domain & Generator Prompt ---
-What type of ideas do you want to submit/create?
-  [1] Electronic / Hardware / IoT
-  [2] Software / AI / Mobile / Web
-  [3] Mixed (Hardware + Software / DeepTech)
-Select idea type [1/2/3] (default: 3): 1
+## 🛠️ Prerequisites & Installation
 
-================================================================================
->>> COPY & PASTE THIS PROMPT INTO ANY AI AGENT (ChatGPT / Claude / Gemini) <<<
-================================================================================
-... [Agent prompt is printed here for easy copy-pasting] ...
+### 1. Requirements
+- **Operating System**: Windows 10/11, macOS, or Linux
+- **Python**: Version 3.10, 3.11, or 3.12
+- **Browser**: Google Chrome or Microsoft Edge installed
 
-6. Locate your idea file path [Idea.md]: Idea.md
+### 2. Clone the Repository
+```powershell
+git clone https://github.com/rKyzen/Youth-Ideathon-Bot.git
+cd Youth-Ideathon-Bot
+```
 
---- Active Submission Parameters ---
-Participation Type : Team
-Primary SID (SID 1): YI26-11860
-Teammate 1 (SID 2) : YI26-08461
-Teammate 2 (SID 3) : YI26-09892
-Mentor (Exact)     : Umesh Verma (ATL)
-Idea Catalog File  : Idea.md
-==============================================================
+### 3. Install Python Dependencies
+```powershell
+pip install playwright fastapi "uvicorn[standard]" jinja2 beautifulsoup4
+playwright install chromium
+```
+
+---
+
+## 🚀 Quick Start
+
+### 1. Launch Web Dashboard (Recommended)
+```powershell
+python app.py
+```
+Open **`http://localhost:8000`** in your browser to configure and run visually.
+
+### 2. Terminal Interactive Mode
+```powershell
+python submit_ideas.py
+```
+
+### 3. Dry-Run Mode (Safe Verification)
+```powershell
+# Dry-run all ideas
+python submit_ideas.py --dry-run
+
+# Dry-run only the first idea
+python submit_ideas.py --dry-run --single-dry-run
+```
+
+### 4. Non-Interactive CLI Mode
+```powershell
+python submit_ideas.py `
+  --non-interactive `
+  --participation-type Team `
+  --primary-sid "YI26-11860" `
+  --sid-2 "YI26-08461" `
+  --sid-3 "YI26-09892" `
+  --mentor "Umesh Verma (ATL)" `
+  --data-file "Idea.md"
 ```
 
 ---
@@ -212,7 +269,7 @@ Every idea MUST adhere strictly to the following markdown template:
 
 ## ⏱️ Estimated Completion Time (ETA)
 
-At the start of execution, the engine displays an ETA summary and updates it as ideas are submitted:
+At the start of execution, the engine calculates ETA upfront and reports dynamic progress:
 
 ```text
 [INFO] ==============================================================
@@ -228,41 +285,6 @@ At the start of execution, the engine displays an ETA summary and updates it as 
 [INFO] ==============================================================
 ...
 [INFO] Completed [IDEA-01] in 28.2s -> Status: DRY_RUN
-```
-
----
-
-## 🚀 Quick Start
-
-### 1. Interactive Mode (Default)
-```powershell
-python submit_ideas.py
-```
-
-### 2. Dry-Run Mode (Safe Verification)
-```powershell
-# Dry-run across all ideas
-python submit_ideas.py --dry-run
-
-# Dry-run only the first idea
-python submit_ideas.py --dry-run --single-dry-run
-```
-
-### 3. Non-Interactive CLI Mode
-```powershell
-python submit_ideas.py `
-  --non-interactive `
-  --participation-type Team `
-  --primary-sid "YI26-11860" `
-  --sid-2 "YI26-08461" `
-  --sid-3 "YI26-09892" `
-  --mentor "Umesh Verma (ATL)" `
-  --data-file "Idea.md"
-```
-
-### 4. Targeted Single-Idea Run
-```powershell
-python submit_ideas.py --dry-run --idea-id IDEA-03
 ```
 
 ---
