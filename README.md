@@ -10,24 +10,25 @@
 
 An intelligent, resilient, and human-like automation pipeline built with **Playwright Python** to sequentially batch-submit innovation proposals to the [Youth Ideathon Portal](https://youthideathon.in/submit-your-idea/).
 
-Includes **interactive startup prompts**, native **Markdown (`Idea.md`) parsing**, **dynamic AJAX mentor lookup**, **Cloudflare Turnstile bypass**, **character validation**, **idempotent re-runs**, and **automatic screenshot auditing**.
+Includes **interactive startup prompts**, **idea domain selector**, **built-in AI agent prompt generator**, **real-time completion time estimation (ETA)**, native **Markdown (`Idea.md`) parsing**, **dynamic AJAX mentor lookup**, **Cloudflare Turnstile bypass**, **character validation**, and **automatic screenshot auditing**.
 
 ---
 
 ## 📑 Table of Contents
 - [Key Features](#-key-features)
 - [Workflow Architecture](#-workflow-architecture)
-- [Project Structure](#-project-structure)
-- [Prerequisites & Installation](#-prerequisites--installation)
-- [Quick Start](#-quick-start)
-  - [1. Interactive Mode (Default)](#1-interactive-mode-default)
-  - [2. Dry-Run Mode (Safe Verification)](#2-dry-run-mode-safe-verification)
-  - [3. Non-Interactive CLI Mode](#3-non-interactive-cli-mode)
-  - [4. Targeted Submission](#4-targeted-submission)
+- [Interactive Startup Wizard & AI Prompt Generator](#-interactive-startup-wizard--ai-prompt-generator)
+- [AI Agent Prompt to Generate `Idea.md`](#-ai-agent-prompt-to-generate-ideamd)
 - [Idea Catalog Format (`Idea.md`)](#-idea-catalog-format-ideamd)
   - [Standard Idea Template](#standard-idea-template)
   - [IRCTC Challenge Theme Template](#irctc-challenge-theme-template)
   - [Allowed Form Field Values](#allowed-form-field-values)
+- [Estimated Completion Time (ETA)](#-estimated-completion-time-eta)
+- [Quick Start](#-quick-start)
+  - [1. Interactive Mode (Default)](#1-interactive-mode-default)
+  - [2. Dry-Run Mode (Safe Verification)](#2-dry-run-mode-safe-verification)
+  - [3. Non-Interactive CLI Mode](#3-non-interactive-cli-mode)
+  - [4. Targeted Single-Idea Run](#4-targeted-single-idea-run)
 - [CLI Reference](#-cli-reference)
 - [Audit Logging & Evidence](#-audit-logging--evidence)
 - [Cloudflare Bypass Mechanism](#-cloudflare-bypass-mechanism)
@@ -37,16 +38,19 @@ Includes **interactive startup prompts**, native **Markdown (`Idea.md`) parsing*
 
 ## 🌟 Key Features
 
-- **Interactive Startup Wizard**: On launch, interactively configures participation type (*Team* or *Individual*), SIDs, and exact mentor string with sensible defaults.
+- **Interactive Startup Wizard**: On launch, interactively configures participation type (*Team* or *Individual*), SIDs, exact mentor string, idea domain, and file location.
+- **Built-in AI Idea Generator Prompt**: Select your domain (*Electronics*, *Software*, or *Mix*), and the CLI outputs an optimized prompt ready to paste into ChatGPT, Claude, or Gemini to generate your `Idea.md`.
+- **Dynamic File Locator**: Prompts you to specify or locate your custom `Idea.md` path on disk with validation.
+- **Estimated Completion Time (ETA)**: Calculates batch ETA upfront based on delay parameters and dynamically reports remaining time and target finish time after every submission.
+- **Direct Submissions (No Skipping)**: By default, submits all ideas present in the catalog file without arbitrary skipping.
 - **Native Markdown Parser (`Idea.md`)**: Write and review ideas in formatted Markdown. Supports standard themes, IRCTC sub-themes, and custom blockquotes.
 - **Dynamic AJAX Mentor Resolution**: Inputs primary SID (`YI26-11860`) and dispatches native `blur`/`change` events to trigger the portal's AJAX lookup (`action: yi26_get_mentors_by_sid`), automatically polling until the mentor option loads.
 - **Dynamic Dropdown Handler**: Accurately selects options across origin, stage, projected reach, why great, main theme, and conditional IRCTC sub-themes.
-- **Strict Pre-Validation**: Verifies idea descriptions are strictly $\le 500$ characters before launching or touching the browser, preventing form submission rejections.
+- **Strict Pre-Validation**: Verifies idea descriptions are strictly $\le 500$ characters before launching or touching the browser, preventing portal rejections.
 - **Undetectable Cloudflare Clearance**: Leverages persistent browser profiles with stealth flags (`--disable-blink-features=AutomationControlled`) to pass Cloudflare Turnstile verification.
 - **Human-Like Pacing**:
   - $1.0\text{s} - 3.0\text{s}$ randomized pause between field inputs.
   - $8.0\text{s} - 12.0\text{s}$ randomized cooldown between idea submissions.
-- **Full Idempotency**: Automatically reads [`submission_log.csv`](submission_log.csv) on startup and skips ideas already marked `SUCCESS`. Safe to re-run anytime.
 - **Fault-Tolerant Retries**: Retries failed attempts once with diagnostic error screenshots without crashing the batch run.
 - **Audit Trails & Screenshots**: Captures pre-submission, dry-run, and confirmation screenshots for every idea into the `screenshots/` directory.
 
@@ -57,78 +61,38 @@ Includes **interactive startup prompts**, native **Markdown (`Idea.md`) parsing*
 ```mermaid
 flowchart TD
     A([Start: submit_ideas.py]) --> B[Interactive Configuration Wizard\nTeam/Indiv, SID 1/2/3, Mentor]
-    B --> C[Load Ideas from Idea.md / JSON / CSV]
-    C --> D[Read submission_log.csv\nFilter already SUCCESS ideas]
-    D --> E{Remaining ideas?}
-    E -- No --> Z([All Ideas Processed - Exit])
-    E -- Yes --> F[Select Next Idea]
-    F --> G{Description <= 500 chars?}
-    G -- No --> H[Log VALIDATION_ERROR\nSkip browser interaction]
-    H --> E
-    G -- Yes --> I[Launch Persistent Chrome Session]
-    I --> J[Clear Cloudflare Turnstile]
-    J --> K[Fill Participation Type & Primary SID]
-    K --> L[Trigger Blur & AJAX Mentor Lookup]
-    L --> M[Select Exact Mentor & Teammate SIDs]
-    M --> N[Fill Origin, Stage, Reach, Theme & Description]
-    N --> O{Mode == Dry-Run?}
-    O -- Yes --> P[Capture Screenshot\nLog DRY_RUN - Do Not Submit]
-    P --> T[Inter-submission Delay: 8-12s]
-    O -- No --> Q[Click 'Submit Idea'\nWait for /thank-you]
-    Q -- Success --> R[Capture Screenshot\nLog SUCCESS]
-    Q -- Fail --> S[Capture Error Shot\nRetry 1x -> Log FAILED]
-    R --> T
-    S --> T
-    T --> E
+    B --> C[Select Idea Domain: Electronics / Software / Mix]
+    C --> D[Display AI Agent Prompt for Idea.md]
+    D --> E[Locate Idea.md File Path]
+    E --> F[Calculate Initial ETA Duration]
+    F --> G{More ideas to submit?}
+    G -- No --> Z([Batch Complete! Print Total Time])
+    G -- Yes --> H[Select Next Idea]
+    H --> I{Description <= 500 chars?}
+    I -- No --> J[Log VALIDATION_ERROR\nSkip browser interaction]
+    J --> G
+    I -- Yes --> K[Launch Persistent Chrome Session]
+    K --> L[Clear Cloudflare Turnstile]
+    L --> M[Fill Participation Type & Primary SID]
+    M --> N[Trigger Blur & AJAX Mentor Lookup]
+    N --> O[Select Exact Mentor & Teammate SIDs]
+    O --> P[Fill Origin, Stage, Reach, Theme & Description]
+    P --> Q{Mode == Dry-Run?}
+    Q -- Yes --> R[Capture Screenshot\nLog DRY_RUN - Do Not Submit]
+    R --> U[Cooldown Delay: 8-12s]
+    Q -- No --> S[Click 'Submit Idea'\nWait for /thank-you]
+    S -- Success --> T[Capture Screenshot\nLog SUCCESS]
+    S -- Fail --> V[Capture Error Shot\nRetry 1x -> Log FAILED]
+    T --> U
+    V --> U
+    U --> G
 ```
 
 ---
 
-## 📂 Project Structure
+## 💻 Interactive Startup Wizard & AI Prompt Generator
 
-```text
-Youth-Ideathon-Bot/
-├── Idea.md               # Primary idea catalog in clean Markdown
-├── ideas.json            # JSON export of ideas catalog
-├── ideas.csv             # CSV export of ideas catalog
-├── submit_ideas.py       # Core Playwright automation & CLI engine
-├── submission_log.csv    # Audit log recording timestamps, statuses & proof paths
-├── screenshots/          # Full-page verification & confirmation screenshots
-├── .gitignore            # Git exclusion rules (Chrome profiles, logs)
-└── README.md             # Project documentation
-```
-
----
-
-## 🛠️ Prerequisites & Installation
-
-### 1. Requirements
-- **Operating System**: Windows 10/11, macOS, or Linux
-- **Python**: Version 3.10, 3.11, or 3.12
-- **Browser**: Google Chrome or Microsoft Edge installed
-
-### 2. Clone the Repository
-```powershell
-git clone https://github.com/rKyzen/Youth-Ideathon-Bot.git
-cd Youth-Ideathon-Bot
-```
-
-### 3. Install Python Dependencies
-```powershell
-pip install playwright beautifulsoup4
-playwright install chromium
-```
-
----
-
-## 🚀 Quick Start
-
-### 1. Interactive Mode (Default)
-Run the script directly in your terminal. You will be prompted to confirm or customize the parameters:
-
-```powershell
-python submit_ideas.py
-```
+When launching `python submit_ideas.py`:
 
 ```text
 ==============================================================
@@ -142,51 +106,67 @@ Press [Enter] to accept the suggested default value in [brackets].
 4. SID 3 (Teammate 2 SID) [YI26-09892]: 
 5. Mentor Name (exact detail, e.g. Name (Stream)) [Umesh Verma (ATL)]: 
 
+--- Idea Domain & Generator Prompt ---
+What type of ideas do you want to submit/create?
+  [1] Electronic / Hardware / IoT
+  [2] Software / AI / Mobile / Web
+  [3] Mixed (Hardware + Software / DeepTech)
+Select idea type [1/2/3] (default: 3): 1
+
+================================================================================
+>>> COPY & PASTE THIS PROMPT INTO ANY AI AGENT (ChatGPT / Claude / Gemini) <<<
+================================================================================
+... [Agent prompt is printed here for easy copy-pasting] ...
+
+6. Locate your idea file path [Idea.md]: Idea.md
+
 --- Active Submission Parameters ---
 Participation Type : Team
 Primary SID (SID 1): YI26-11860
 Teammate 1 (SID 2) : YI26-08461
 Teammate 2 (SID 3) : YI26-09892
 Mentor (Exact)     : Umesh Verma (ATL)
+Idea Catalog File  : Idea.md
 ==============================================================
 ```
 
-### 2. Dry-Run Mode (Safe Verification)
-Populates all fields on the live portal, captures a full-page verification screenshot in `screenshots/`, and exits **without** clicking submit:
+---
 
-```powershell
-# Dry run for all ideas
-python submit_ideas.py --dry-run
+## 🤖 AI Agent Prompt to Generate `Idea.md`
 
-# Dry run for just the first idea
-python submit_ideas.py --dry-run --single-dry-run
-```
+You can copy and paste the prompt below into ChatGPT, Claude, or Gemini to produce a ready-to-run `Idea.md`:
 
-### 3. Non-Interactive CLI Mode
-Ideal for scheduled tasks, batch scripts, or CI/CD pipelines:
+```text
+You are an expert school/college innovation mentor for the Youth Ideathon 2026 competition.
+Please generate an 'Idea.md' markdown file containing 10-15 novel, practical, and highly impactful
+ideas in the domain: [Electronics / Software / Mixed].
 
-```powershell
-python submit_ideas.py `
-  --non-interactive `
-  --participation-type Team `
-  --primary-sid "YI26-11860" `
-  --sid-2 "YI26-08461" `
-  --sid-3 "YI26-09892" `
-  --mentor "Umesh Verma (ATL)"
-```
+Every idea MUST adhere strictly to the following markdown template:
 
-### 4. Targeted Submission
-Submit or dry-run a specific idea ID:
+### IDEA-01: [Title of Idea]
+- **Theme:** [Select ONE: AI and Chip Innovation | Sustainability | Space | Next Billion Innovation Challenge | Supporting Girl Entrepreneurs | EdTech | IRCTC challenge | Open Innovation]
+- **Origin:** [Select ONE: I read something like this in a book or internet | I faced this problem | My family or close friends faced this problem | I got this during a discussion with someone | From my teacher or mentor | Can't remember]
+- **Stage:** [Select ONE: Idea Stage | User Research Stage | Design Stage | Early Prototyping Stage | Prototype Validation Stage | Already have few customers]
+- **3-Year Projected Users:** [Select ONE: Less than 1,000 | 1,000 | 25,000 | 1,00,000 | 10,00,000 | More than 10,00,000]
+- **Why Great:** [Select ONE: It solves a problem faced by many people | It solves a problem that has been unsolved for ages | I have already developed the solution | It is very innovative | It uses new technology | Other]
+- **Description:**
+> [Clear description strictly UNDER 500 characters explaining the problem, hardware/software architecture, and real-world impact. DO NOT EXCEED 500 CHARACTERS.]
 
-```powershell
-python submit_ideas.py --dry-run --idea-id IDEA-03
+*Important Guidelines:*
+1. If Theme is 'IRCTC challenge', format as:
+   - **Theme:** IRCTC challenge (Sub-theme)
+   where Sub-theme is ONE of:
+   - Innovation and Improvements in Railway Catering Services
+   - Packaged Drinking Water
+   - IRCTC- One Stop Shop Travel Solution
+   - Think Ticketing, Think IRCTC
+2. Ensure the description character count is strictly between 250 and 480 characters.
+3. Do not include markdown code fence blocks inside descriptions.
 ```
 
 ---
 
 ## 📝 Idea Catalog Format (`Idea.md`)
-
-The engine natively parses ideas from [`Idea.md`](Idea.md). Add your ideas using the following Markdown schema:
 
 ### Standard Idea Template
 
@@ -202,8 +182,6 @@ The engine natively parses ideas from [`Idea.md`](Idea.md). Add your ideas using
 ```
 
 ### IRCTC Challenge Theme Template
-
-When targeting the **IRCTC challenge**, declare the sub-theme either in parentheses or with `- **IRCTC Sub-theme:**`:
 
 ```markdown
 ### IDEA-03: AI Edge Vision for Real-Time Railway Track Debris Warning
@@ -232,6 +210,63 @@ When targeting the **IRCTC challenge**, declare the sub-theme either in parenthe
 
 ---
 
+## ⏱️ Estimated Completion Time (ETA)
+
+At the start of execution, the engine displays an ETA summary and updates it as ideas are submitted:
+
+```text
+[INFO] ==============================================================
+[INFO] [BATCH] Batch Submission Initialized
+[INFO] [BATCH] Total Ideas to Submit : 15
+[INFO] [ETA] Estimated Total Time    : ~7m 45s (~31s per idea)
+[INFO] [ETA] Target Completion Time  : 13:15:29
+[INFO] ==============================================================
+
+[INFO] ==============================================================
+[INFO] [SUBMITTING] (1/15): [IDEA-01] Smart Solar PV Self-Cleaning & Dust Detection Ring
+[INFO] [ETA] Est. Remaining Time : ~7m 45s (Finish ~13:15:30)
+[INFO] ==============================================================
+...
+[INFO] Completed [IDEA-01] in 28.2s -> Status: DRY_RUN
+```
+
+---
+
+## 🚀 Quick Start
+
+### 1. Interactive Mode (Default)
+```powershell
+python submit_ideas.py
+```
+
+### 2. Dry-Run Mode (Safe Verification)
+```powershell
+# Dry-run across all ideas
+python submit_ideas.py --dry-run
+
+# Dry-run only the first idea
+python submit_ideas.py --dry-run --single-dry-run
+```
+
+### 3. Non-Interactive CLI Mode
+```powershell
+python submit_ideas.py `
+  --non-interactive `
+  --participation-type Team `
+  --primary-sid "YI26-11860" `
+  --sid-2 "YI26-08461" `
+  --sid-3 "YI26-09892" `
+  --mentor "Umesh Verma (ATL)" `
+  --data-file "Idea.md"
+```
+
+### 4. Targeted Single-Idea Run
+```powershell
+python submit_ideas.py --dry-run --idea-id IDEA-03
+```
+
+---
+
 ## ⚙️ CLI Reference
 
 | Flag | Default | Description |
@@ -241,6 +276,7 @@ When targeting the **IRCTC challenge**, declare the sub-theme either in parenthe
 | `--single-dry-run` | `False` | Halts execution after one dry-run idea |
 | `--idea-id <ID>` | `None` | Filters run to a specific idea (e.g. `IDEA-05`) |
 | `--max-ideas <N>` | `None` | Caps total ideas submitted in the session |
+| `--skip-existing` | `False` | Only skips ideas if explicitly passed |
 | `--non-interactive` | `False` | Bypasses interactive startup prompts |
 | `--participation-type` | `Team` | `Team` or `Individual` |
 | `--primary-sid <SID>` | `YI26-11860` | Primary student ID (SID 1) |
@@ -264,7 +300,7 @@ Every submission is appended to [`submission_log.csv`](submission_log.csv) with 
 ### Status Glossary
 - `SUCCESS`: Submission verified and redirected to `/thank-you`.
 - `DRY_RUN`: All inputs populated and screenshot saved; submit was not clicked.
-- `SKIPPED`: Already recorded as `SUCCESS` in previous runs (idempotency).
+- `SKIPPED`: Marked as skipped only if `--skip-existing` is supplied.
 - `VALIDATION_ERROR`: Description exceeded 500 characters; blocked before browser launch.
 - `FAILED`: Submission failed twice; diagnostic screenshot captured.
 

@@ -3,7 +3,8 @@ Youth Ideathon Idea Submission Automation Script
 ------------------------------------------------
 Automates sequential submission of ideas to https://youthideathon.in/submit-your-idea/
 using Playwright with robust Cloudflare bypass, interactive startup configuration,
-markdown/JSON/CSV idea loading, human-like delays, idempotency, and comprehensive logging.
+AI agent prompt generation, estimated completion time (ETA), markdown/JSON/CSV idea loading,
+human-like delays, and comprehensive logging.
 """
 
 import argparse
@@ -15,11 +16,21 @@ import os
 import random
 import re
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional, Set
 
 from playwright.async_api import BrowserContext, Page, async_playwright
+
+# Ensure UTF-8 output encoding across Windows consoles
+if sys.platform == "win32":
+    try:
+        if sys.stdout.encoding.lower() != "utf-8":
+            sys.stdout.reconfigure(encoding="utf-8")
+        if sys.stderr.encoding.lower() != "utf-8":
+            sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
 
 # Setup logging
 logging.basicConfig(
@@ -40,10 +51,58 @@ SCREENSHOTS_DIR = "screenshots"
 USER_DATA_DIR = "chrome_user_data"
 
 
+def format_duration(seconds: float) -> str:
+    """Format seconds into human-readable duration (e.g. 5m 20s or 1h 10m 15s)."""
+    seconds = max(0, int(seconds))
+    hrs, rem = divmod(seconds, 3600)
+    mins, secs = divmod(rem, 60)
+    if hrs > 0:
+        return f"{hrs}h {mins}m {secs}s"
+    elif mins > 0:
+        return f"{mins}m {secs}s"
+    else:
+        return f"{secs}s"
+
+
+def print_agent_prompt(idea_type: str):
+    """Prints a static ready-to-copy prompt for generating Idea.md via an AI agent."""
+    prompt_banner = f"""
+================================================================================
+>>> COPY & PASTE THIS PROMPT INTO ANY AI AGENT (ChatGPT / Claude / Gemini) <<<
+================================================================================
+
+You are an expert school/college innovation mentor for the Youth Ideathon 2026 competition.
+Please generate an 'Idea.md' markdown file containing 10-15 novel, practical, and highly impactful
+ideas in the domain: {idea_type}.
+
+Every idea MUST adhere strictly to the following markdown template:
+
+### IDEA-01: [Title of Idea]
+- **Theme:** [Select ONE: AI and Chip Innovation | Sustainability | Space | Next Billion Innovation Challenge | Supporting Girl Entrepreneurs | EdTech | IRCTC challenge | Open Innovation]
+- **Origin:** [Select ONE: I read something like this in a book or internet | I faced this problem | My family or close friends faced this problem | I got this during a discussion with someone | From my teacher or mentor | Can't remember]
+- **Stage:** [Select ONE: Idea Stage | User Research Stage | Design Stage | Early Prototyping Stage | Prototype Validation Stage | Already have few customers]
+- **3-Year Projected Users:** [Select ONE: Less than 1,000 | 1,000 | 25,000 | 1,00,000 | 10,00,000 | More than 10,00,000]
+- **Why Great:** [Select ONE: It solves a problem faced by many people | It solves a problem that has been unsolved for ages | I have already developed the solution | It is very innovative | It uses new technology | Other]
+- **Description:**
+> [Clear description strictly UNDER 500 characters explaining the problem, hardware/software architecture, and real-world impact. DO NOT EXCEED 500 CHARACTERS.]
+
+*Important Guidelines:*
+1. If Theme is 'IRCTC challenge', format as:
+   - **Theme:** IRCTC challenge (Sub-theme)
+   where Sub-theme is ONE of:
+   - Innovation and Improvements in Railway Catering Services
+   - Packaged Drinking Water
+   - IRCTC- One Stop Shop Travel Solution
+   - Think Ticketing, Think IRCTC
+2. Ensure the description character count is strictly between 250 and 480 characters.
+3. Do not include markdown code fence blocks inside descriptions.
+================================================================================
+"""
+    print(prompt_banner)
+
+
 def parse_markdown_ideas(text: str) -> List[Dict]:
     """Parse ideas catalog from a Markdown file (e.g. Idea.md)."""
-    # Regex pattern to match idea blocks
-    # Supports ### IDEA-XX: Title or ### Title
     idea_blocks = re.split(r'\n(?=###\s+)', '\n' + text)
     ideas = []
 
@@ -52,7 +111,6 @@ def parse_markdown_ideas(text: str) -> List[Dict]:
         if not block.startswith("###"):
             continue
 
-        # Extract title and optional ID
         header_match = re.match(r'###\s+(?:(IDEA-\d+):\s+)?([^\n]+)', block)
         if not header_match:
             continue
@@ -60,7 +118,6 @@ def parse_markdown_ideas(text: str) -> List[Dict]:
         idea_id = header_match.group(1) or ""
         title = header_match.group(2).strip()
 
-        # Extract fields using regex
         theme_m = re.search(r'-\s+\*\*Theme:\*\*\s+([^\n]+)', block, re.IGNORECASE)
         irctc_sub_m = re.search(r'-\s+\*\*(?:Sub-Theme|IRCTC Sub-theme):\*\*\s+([^\n]+)', block, re.IGNORECASE)
         origin_m = re.search(r'-\s+\*\*Origin:\*\*\s+([^\n]+)', block, re.IGNORECASE)
@@ -73,7 +130,6 @@ def parse_markdown_ideas(text: str) -> List[Dict]:
         theme = theme_raw
         irctc_theme = irctc_sub_m.group(1).strip() if irctc_sub_m else ""
 
-        # Handle inline IRCTC format: Theme: IRCTC challenge (Sub-theme)
         if not irctc_theme and "IRCTC challenge" in theme_raw:
             inline_irctc = re.match(r'IRCTC challenge\s*\((.+?)\)', theme_raw, re.IGNORECASE)
             if inline_irctc:
@@ -85,7 +141,6 @@ def parse_markdown_ideas(text: str) -> List[Dict]:
         projected_reach = reach_m.group(1).strip() if reach_m else ""
         why_great = why_great_m.group(1).strip() if why_great_m else ""
 
-        # Clean description (strip markdown blockquote '>' and extra whitespace)
         description = ""
         if desc_m:
             raw_desc = desc_m.group(1)
@@ -118,7 +173,6 @@ def parse_markdown_ideas(text: str) -> List[Dict]:
 
 def load_ideas(data_path: Optional[str] = None) -> List[Dict]:
     """Load ideas from Idea.md, ideas.json, or ideas.csv."""
-    # If no data path provided, detect available files
     if not data_path:
         for candidate in ["Idea.md", "ideas.json", "ideas.csv"]:
             if Path(candidate).exists():
@@ -141,7 +195,6 @@ def load_ideas(data_path: Optional[str] = None) -> List[Dict]:
         with open(path, "r", encoding="utf-8-sig") as f:
             ideas = list(csv.DictReader(f))
     else:
-        # Fallback detection
         try:
             with open(path, "r", encoding="utf-8") as f:
                 content = f.read()
@@ -217,15 +270,11 @@ async def select_dropdown_by_text(
     field_name: str = "",
     timeout: float = 10.0
 ) -> bool:
-    """
-    Robustly select an option in a <select> element by its visible text.
-    Handles exact match, case-insensitive match, and value attribute matching.
-    """
+    """Robustly select an option in a <select> element by its visible text."""
     logger.debug(f"Selecting '{target_text}' for {field_name or selector}")
     loc = page.locator(selector)
     await loc.wait_for(state="attached", timeout=timeout * 1000)
 
-    # First attempt: standard Playwright label selection
     try:
         await loc.select_option(label=target_text, timeout=2000)
         await loc.dispatch_event("change")
@@ -233,7 +282,6 @@ async def select_dropdown_by_text(
     except Exception:
         pass
 
-    # Second attempt: inspect option texts and values manually
     options = await loc.locator("option").all()
     target_norm = target_text.strip().lower()
 
@@ -245,7 +293,6 @@ async def select_dropdown_by_text(
             await loc.dispatch_event("change")
             return True
 
-    # Partial substring fallback
     for opt in options:
         opt_text = (await opt.inner_text()).strip()
         opt_val = await opt.get_attribute("value") or ""
@@ -282,10 +329,7 @@ async def fill_form_for_idea(
     input_delay_min: float = 1.0,
     input_delay_max: float = 3.0
 ) -> str:
-    """
-    Populates all form fields for a given idea following the exact specification.
-    Returns path to the screenshot captured.
-    """
+    """Populates all form fields for a given idea following exact specs."""
     idea_id = idea.get("id", "UNKNOWN")
     title = idea.get("title", "Untitled")
 
@@ -329,7 +373,6 @@ async def fill_form_for_idea(
     logger.info(f"Step 3: Awaiting dynamic mentor dropdown population for -> '{mentor_target}'")
     mentor_select = page.locator("#idea-mentor-select")
 
-    # Poll up to 15 seconds for mentor options to load via AJAX
     mentor_found = False
     for _ in range(15):
         options = await mentor_select.locator("option").all_inner_texts()
@@ -447,7 +490,6 @@ async def submit_and_verify(page: Page, idea_id: str) -> bool:
     submit_btn = page.locator('input[type="submit"][value="Submit Idea"]')
     await submit_btn.click()
 
-    # Wait for either URL change to thank-you or contact form 7 response message
     start_time = asyncio.get_event_loop().time()
     timeout = 30.0
 
@@ -457,7 +499,6 @@ async def submit_and_verify(page: Page, idea_id: str) -> bool:
             logger.info(f"Redirected to confirmation page: {current_url}")
             return True
 
-        # Check form response output container
         resp_output = page.locator(".wpcf7-response-output")
         if await resp_output.count() > 0:
             text = (await resp_output.inner_text()).strip()
@@ -483,22 +524,18 @@ async def process_idea(
     input_delay_min: float,
     input_delay_max: float
 ) -> tuple[str, str, str]:
-    """
-    Validates, fills, and optionally submits a single idea with single retry logic.
-    Returns: (status, screenshot_path, notes)
-    """
+    """Validates, fills, and submits a single idea with single retry logic."""
     idea_id = idea.get("id", "UNKNOWN")
     title = idea.get("title", "Untitled")
     description = idea.get("description", "").strip()
 
-    # Pre-validation Requirement: Description length must be strictly <= 500 chars
     desc_len = len(description)
     if desc_len > 500:
         err_msg = f"Validation Failed: Description length {desc_len} exceeds 500 characters."
         logger.error(f"[{idea_id}] {err_msg}")
         return "VALIDATION_ERROR", "", err_msg
 
-    max_attempts = 2  # 1 initial try + 1 retry
+    max_attempts = 2
     last_error = ""
     screenshot_path = ""
 
@@ -553,8 +590,8 @@ async def process_idea(
 
 def prompt_user_configuration(args: argparse.Namespace) -> Dict:
     """
-    Prompt user interactively for team/individual, SIDs, and mentor details.
-    Allows bypassing with --non-interactive.
+    Prompt user interactively for team/individual, SIDs, mentor details,
+    idea domain (displaying a static agent prompt), and idea file location.
     """
     if args.non_interactive:
         return {
@@ -563,6 +600,7 @@ def prompt_user_configuration(args: argparse.Namespace) -> Dict:
             "mentor_target": args.mentor or "Umesh Verma (ATL)",
             "teammate_1_sid": args.sid_2 or "YI26-08461",
             "teammate_2_sid": args.sid_3 or "YI26-09892",
+            "data_file": args.data_file or "Idea.md",
             "awards": [],
             "agreement": True,
         }
@@ -604,12 +642,42 @@ def prompt_user_configuration(args: argparse.Namespace) -> Dict:
     raw_mentor = input(f"5. Mentor Name (exact detail, e.g. Name (Stream)) [{default_mentor}]: ").strip()
     mentor_target = raw_mentor if raw_mentor else default_mentor
 
+    # 5. Type of ideas: Electronic, Software, or Mix
+    print("\n--- Idea Domain & Generator Prompt ---")
+    print("What type of ideas do you want to submit/create?")
+    print("  [1] Electronic / Hardware / IoT")
+    print("  [2] Software / AI / Mobile / Web")
+    print("  [3] Mixed (Hardware + Software / DeepTech)")
+    type_choice = input("Select idea type [1/2/3] (default: 3): ").strip()
+    type_map = {
+        "1": "Electronic & Hardware Innovation (Sensors, Microcontrollers, IoT, Embedded Systems)",
+        "2": "Software & AI Solutions (Web apps, Mobile applications, Machine Learning, Cloud)",
+        "3": "Mixed Innovation (Hardware + Software, IoT telemetry, Connected Robotics, DeepTech)"
+    }
+    selected_domain = type_map.get(type_choice, type_map["3"])
+
+    # Print static ready-to-copy AI Agent Prompt
+    print_agent_prompt(selected_domain)
+
+    # 6. Locate Idea File
+    default_file = args.data_file or "Idea.md"
+    chosen_file = default_file
+    while True:
+        raw_file = input(f"6. Locate your idea file path [{chosen_file}]: ").strip()
+        test_path = raw_file if raw_file else chosen_file
+        if Path(test_path).exists():
+            chosen_file = test_path
+            break
+        else:
+            print(f"File '{test_path}' not found on disk. Please enter a valid relative or absolute path.")
+
     config = {
         "participation_type": part_type,
         "primary_sid": primary_sid,
         "mentor_target": mentor_target,
         "teammate_1_sid": t1_sid,
         "teammate_2_sid": t2_sid,
+        "data_file": chosen_file,
         "awards": [],
         "agreement": True,
     }
@@ -621,17 +689,20 @@ def prompt_user_configuration(args: argparse.Namespace) -> Dict:
         print(f"Teammate 1 (SID 2) : {config['teammate_1_sid']}")
         print(f"Teammate 2 (SID 3) : {config['teammate_2_sid']}")
     print(f"Mentor (Exact)     : {config['mentor_target']}")
+    print(f"Idea Catalog File  : {config['data_file']}")
     print("=" * 62 + "\n")
 
     return config
 
 
 async def run_automation(args: argparse.Namespace):
-    """Main orchestration loop."""
+    """Main orchestration loop with ETA and sequential submission (no automatic skipping)."""
     config = prompt_user_configuration(args)
-    ideas = load_ideas(args.data_file)
-    successful_ids = get_successful_idea_ids(args.log_file)
-    logger.info(f"Previously successful idea IDs ({len(successful_ids)}): {list(successful_ids)}")
+    data_file_to_load = config.get("data_file") or args.data_file
+    ideas = load_ideas(data_file_to_load)
+
+    # Optional skip check only if user explicitly passed --skip-existing
+    successful_ids = get_successful_idea_ids(args.log_file) if args.skip_existing else set()
 
     # Filter ideas if a specific ID is requested
     if args.idea_id:
@@ -644,7 +715,25 @@ async def run_automation(args: argparse.Namespace):
     if args.max_ideas and args.max_ideas > 0:
         ideas = ideas[:args.max_ideas]
 
-    logger.info(f"Total ideas scheduled for this run: {len(ideas)}")
+    if not ideas:
+        logger.warning("No ideas found to process.")
+        return
+
+    # ETA Calculation
+    avg_input_delay = (args.delay_inputs_min + args.delay_inputs_max) / 2.0
+    avg_submit_delay = (args.delay_submit_min + args.delay_submit_max) / 2.0
+    est_seconds_per_idea = (avg_input_delay * 12) + 6.0 + (avg_submit_delay if not args.dry_run else 1.0)
+    total_est_seconds = est_seconds_per_idea * len(ideas)
+
+    start_run_time = datetime.now()
+    target_finish = start_run_time + timedelta(seconds=total_est_seconds)
+
+    logger.info("=" * 62)
+    logger.info("[BATCH] Batch Submission Initialized")
+    logger.info(f"[BATCH] Total Ideas to Submit : {len(ideas)}")
+    logger.info(f"[ETA] Estimated Total Time    : ~{format_duration(total_est_seconds)} (~{est_seconds_per_idea:.0f}s per idea)")
+    logger.info(f"[ETA] Target Completion Time  : {target_finish.strftime('%H:%M:%S')}")
+    logger.info("=" * 62)
 
     user_data_path = os.path.abspath(args.user_data_dir)
 
@@ -668,16 +757,22 @@ async def run_automation(args: argparse.Namespace):
             idea_id = idea.get("id", f"IDEA-{idx+1:02d}")
             title = idea.get("title", "Untitled")
 
-            # Idempotency check: Skip if already marked SUCCESS
-            if idea_id in successful_ids:
-                logger.info(f"Skipping [{idea_id}] '{title}': Already marked SUCCESS in log.")
+            # Check skip only if user explicitly passed --skip-existing
+            if args.skip_existing and idea_id in successful_ids:
+                logger.info(f"Skipping [{idea_id}] '{title}': Already marked SUCCESS in log (--skip-existing active).")
                 continue
 
             total_processed += 1
-            logger.info(f"\n==================================================")
-            logger.info(f"Processing ({total_processed}/{len(ideas)}): [{idea_id}] {title}")
-            logger.info(f"==================================================")
+            remaining_ideas = len(ideas) - idx
+            remaining_seconds = remaining_ideas * est_seconds_per_idea
+            est_completion_str = (datetime.now() + timedelta(seconds=remaining_seconds)).strftime("%H:%M:%S")
 
+            logger.info(f"\n" + "=" * 62)
+            logger.info(f"[SUBMITTING] ({total_processed}/{len(ideas)}): [{idea_id}] {title}")
+            logger.info(f"[ETA] Est. Remaining Time : ~{format_duration(remaining_seconds)} (Finish ~{est_completion_str})")
+            logger.info("=" * 62)
+
+            idea_start = datetime.now()
             status, shot_path, notes = await process_idea(
                 page=page,
                 idea=idea,
@@ -697,7 +792,9 @@ async def run_automation(args: argparse.Namespace):
                 notes=notes
             )
 
-            # In dry-run, if user only wanted to test one idea or if exiting is desired:
+            elapsed = (datetime.now() - idea_start).total_seconds()
+            logger.info(f"Completed [{idea_id}] in {elapsed:.1f}s -> Status: {status}")
+
             if args.dry_run and args.single_dry_run:
                 logger.info("Single dry run completed. Exiting as requested.")
                 break
@@ -705,11 +802,16 @@ async def run_automation(args: argparse.Namespace):
             # Human-like delay between submissions (8-12 seconds)
             if idx < len(ideas) - 1:
                 wait_time = random.uniform(args.delay_submit_min, args.delay_submit_max)
-                logger.info(f"Waiting {wait_time:.1f}s before next idea...")
+                logger.info(f"Waiting {wait_time:.1f}s cooldown before next idea...")
                 await asyncio.sleep(wait_time)
 
         await context.close()
-        logger.info("Automation completed successfully.")
+        total_time_taken = (datetime.now() - start_run_time).total_seconds()
+        logger.info("\n" + "=" * 62)
+        logger.info(f"[DONE] Batch Process Finished in {format_duration(total_time_taken)}!")
+        logger.info(f"[DONE] Ideas Processed: {total_processed}")
+        logger.info(f"[AUDIT] Audit Log: {args.log_file}")
+        logger.info("=" * 62)
 
 
 def parse_arguments():
@@ -718,7 +820,7 @@ def parse_arguments():
         "--data-file",
         type=str,
         default=None,
-        help="Path to Markdown (Idea.md), JSON, or CSV file containing ideas (default: auto-detect Idea.md)"
+        help="Path to Markdown (Idea.md), JSON, or CSV file containing ideas"
     )
     parser.add_argument(
         "--dry-run",
@@ -760,6 +862,12 @@ def parse_arguments():
         type=str,
         default=USER_DATA_DIR,
         help="Chrome user profile directory for session persistence"
+    )
+    parser.add_argument(
+        "--skip-existing",
+        action="store_true",
+        default=False,
+        help="Skip ideas already marked SUCCESS in submission_log.csv (default: False - submits all ideas without skipping)"
     )
     parser.add_argument(
         "--non-interactive",
