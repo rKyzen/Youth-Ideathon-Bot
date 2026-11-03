@@ -71,6 +71,7 @@ Filename: "{app}\run_app.bat"; Description: "Launch {#AppName}"; Flags: postinst
 ; Remove runtime artefacts but leave any user-added files in the install folder
 Type: filesandordirs; Name: "{app}\screenshots"
 Type: filesandordirs; Name: "{app}\chrome_user_data"
+Type: filesandordirs; Name: "{app}\ai_window_profile"
 Type: filesandordirs; Name: "{app}\__pycache__"
 Type: files; Name: "{app}\automation.log"
 Type: files; Name: "{app}\submission_log.csv"

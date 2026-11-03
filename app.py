@@ -10,14 +10,18 @@ FastAPI backend providing a web-based localhost dashboard for Youth Ideathon sub
 """
 
 import asyncio
+import base64
 import json
 import logging
 import os
 import random
 import shutil
 import socket
+import subprocess
 import sys
+import tempfile
 import threading
+import urllib.error
 import urllib.request
 import webbrowser
 from datetime import datetime, timedelta
@@ -255,6 +259,351 @@ Every idea MUST adhere strictly to the following markdown template:
 2. Ensure the description character count is strictly between 250 and 480 characters.
 3. Do not include markdown code fence blocks inside descriptions."""
     return {"prompt": prompt}
+
+
+# ---------------------------------------------------------------------------
+# AI assistant: embedded-frame policy check + dedicated Chromium window
+# ---------------------------------------------------------------------------
+
+AI_PROVIDERS: Dict[str, Dict[str, str]] = {
+    "chatgpt": {"name": "ChatGPT", "url": "https://chatgpt.com/"},
+    "gemini": {"name": "Gemini", "url": "https://gemini.google.com/app"},
+    "arena": {"name": "Arena.ai", "url": "https://arena.ai/"},
+}
+
+_BROWSER_UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+)
+
+
+def _frame_policy(url: str) -> Dict[str, object]:
+    """Return whether ``url`` may be embedded in this localhost dashboard."""
+    request = urllib.request.Request(
+        url,
+        headers={"User-Agent": _BROWSER_UA, "Accept": "text/html,application/xhtml+xml"},
+    )
+    xfo = ""
+    csp = ""
+    checked = True
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:
+            xfo = response.headers.get("X-Frame-Options", "") or ""
+            csp = " ; ".join(response.headers.get_all("Content-Security-Policy") or [])
+    except urllib.error.HTTPError as exc:
+        headers = exc.headers
+        xfo = (headers.get("X-Frame-Options", "") if headers else "") or ""
+        csp = " ; ".join((headers.get_all("Content-Security-Policy") if headers else []) or [])
+        if not xfo and not csp:
+            checked = False
+    except Exception as exc:
+        return {"embeddable": False, "checked": False, "reason": f"Could not verify the provider policy ({exc})."}
+
+    xfo_lower = xfo.lower()
+    if "deny" in xfo_lower:
+        return {"embeddable": False, "checked": checked, "reason": f"X-Frame-Options: {xfo.split(',')[0].strip()}"}
+    if "sameorigin" in xfo_lower:
+        return {"embeddable": False, "checked": checked, "reason": f"X-Frame-Options: {xfo.split(',')[0].strip()}"}
+    if "allow-from" in xfo_lower:
+        # Obsolete and ignored (blocked) by modern browsers.
+        return {"embeddable": False, "checked": checked, "reason": f"X-Frame-Options: {xfo.split(',')[0].strip()}"}
+
+    directive = ""
+    for part in csp.split(";"):
+        if part.strip().lower().startswith("frame-ancestors"):
+            directive = part.strip()
+            break
+
+    if directive:
+        tokens = [token.strip() for token in directive.lower().split()[1:]]
+        allowed = "'none'" not in tokens and (
+            "*" in tokens
+            or "http:" in tokens
+            or "https:" in tokens
+            or any("localhost" in token or "127.0.0.1" in token for token in tokens)
+        )
+        if not allowed:
+            return {"embeddable": False, "checked": checked, "reason": directive}
+
+    return {"embeddable": True, "checked": checked, "reason": ""}
+
+
+def _chromium_candidates() -> List[tuple]:
+    """Return installed Chromium-based browsers, most preferred first."""
+    env = os.environ
+    candidates = []
+
+    for base, label in (
+        (env.get("PROGRAMFILES"), "chrome"),
+        (env.get("PROGRAMFILES(X86)"), "chrome"),
+        (env.get("LOCALAPPDATA"), "chrome"),
+    ):
+        if base:
+            candidates.append((Path(base) / "Google" / "Chrome" / "Application" / "chrome.exe", label))
+
+    for base in (env.get("PROGRAMFILES(X86)"), env.get("PROGRAMFILES"), env.get("LOCALAPPDATA")):
+        if base:
+            candidates.append((Path(base) / "Microsoft" / "Edge" / "Application" / "msedge.exe", "edge"))
+
+    local = env.get("LOCALAPPDATA")
+    if local:
+        playwright_root = Path(local) / "ms-playwright"
+        if playwright_root.exists():
+            for pattern in ("chromium-*/chrome-win/chrome.exe", "chromium-*/chrome-win64/chrome.exe"):
+                for exe in sorted(playwright_root.glob(pattern), reverse=True):
+                    candidates.append((exe, "chromium"))
+
+    seen = set()
+    found = []
+    for path, label in candidates:
+        key = str(path).lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        try:
+            if path.is_file():
+                found.append((path, label))
+        except OSError:
+            continue
+    return found
+
+
+class AIProviderRequest(BaseModel):
+    provider: str = "chatgpt"
+
+
+class PickPathRequest(BaseModel):
+    mode: str = "file"
+    initial: str = ""
+    title: str = "Select a file"
+    filter: str = ""
+
+
+@app.get("/api/ai/embed-check")
+def ai_embed_check(provider: str = "chatgpt"):
+    """Report whether the selected AI provider permits iframe embedding."""
+    key = provider.strip().lower()
+    meta = AI_PROVIDERS.get(key)
+    if not meta:
+        return {"success": False, "error": "Unknown AI provider."}
+    policy = _frame_policy(meta["url"])
+    return {"success": True, "provider": key, "name": meta["name"], "url": meta["url"], **policy}
+
+
+@app.post("/api/ai/open")
+def ai_open_window(req: AIProviderRequest):
+    """Open the provider in a dedicated Chromium app window with a saved profile."""
+    key = req.provider.strip().lower()
+    meta = AI_PROVIDERS.get(key)
+    if not meta:
+        return {"success": False, "error": "Unknown AI provider."}
+
+    url = meta["url"]
+    candidates = _chromium_candidates()
+    if not candidates:
+        try:
+            webbrowser.open(url, new=2)
+            return {
+                "success": True,
+                "mode": "tab",
+                "browser": "default",
+                "url": url,
+                "message": "No Chromium browser found; opened in the default browser.",
+            }
+        except Exception as exc:
+            return {"success": False, "error": f"Could not open a browser: {exc}"}
+
+    exe, label = candidates[0]
+    profile_root = APP_DIR / "ai_window_profile" / label
+    try:
+        profile_root.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        profile_root = Path(tempfile.gettempdir()) / "youth-ideathon-ai" / label
+        profile_root.mkdir(parents=True, exist_ok=True)
+
+    args = [
+        str(exe),
+        f"--app={url}",
+        f"--user-data-dir={profile_root}",
+        "--window-size=1280,960",
+        "--no-first-run",
+        "--no-default-browser-check",
+        "--hide-crash-restore-bubble",
+    ]
+    creationflags = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(
+        subprocess, "CREATE_NEW_PROCESS_GROUP", 0
+    )
+    try:
+        subprocess.Popen(
+            args,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            close_fds=True,
+            creationflags=creationflags,
+        )
+    except Exception as exc:
+        logger.exception("Could not launch the AI window")
+        return {"success": False, "error": f"Could not launch {label}: {exc}"}
+
+    return {
+        "success": True,
+        "mode": "app",
+        "browser": label,
+        "url": url,
+        "profile": str(profile_root),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Native file / folder picker (Windows common dialogs)
+# ---------------------------------------------------------------------------
+
+_PICKER_PS = r"""
+$ErrorActionPreference = 'Stop'
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+$out = $env:YI_PICK_OUT
+try {
+    $owner = New-Object System.Windows.Forms.Form
+    $owner.FormBorderStyle = 'None'
+    $owner.ShowInTaskbar = $false
+    $owner.TopMost = $true
+    $owner.StartPosition = 'CenterScreen'
+    $owner.Width = 1
+    $owner.Height = 1
+    $owner.Opacity = 0
+    $owner.Show()
+    if ($env:YI_PICK_MODE -eq 'dir') {
+        $dlg = New-Object System.Windows.Forms.FolderBrowserDialog
+        $dlg.Description = $env:YI_PICK_TITLE
+        $dlg.ShowNewFolderButton = $true
+        if ($env:YI_PICK_INITIAL -and (Test-Path -LiteralPath $env:YI_PICK_INITIAL)) {
+            $dlg.SelectedPath = $env:YI_PICK_INITIAL
+        }
+        $result = $dlg.ShowDialog($owner)
+        if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
+            [System.IO.File]::WriteAllText($out, $dlg.SelectedPath, (New-Object System.Text.UTF8Encoding($false)))
+        }
+    } else {
+        $dlg = New-Object System.Windows.Forms.OpenFileDialog
+        $dlg.Title = $env:YI_PICK_TITLE
+        $dlg.CheckFileExists = $true
+        $dlg.CheckPathExists = $true
+        $dlg.Multiselect = $false
+        $dlg.RestoreDirectory = $true
+        if ($env:YI_PICK_FILTER) { $dlg.Filter = $env:YI_PICK_FILTER }
+        if ($env:YI_PICK_INITIAL -and (Test-Path -LiteralPath $env:YI_PICK_INITIAL)) {
+            $dlg.InitialDirectory = $env:YI_PICK_INITIAL
+        }
+        $result = $dlg.ShowDialog($owner)
+        if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
+            [System.IO.File]::WriteAllText($out, $dlg.FileName, (New-Object System.Text.UTF8Encoding($false)))
+        }
+    }
+    $owner.Close()
+} catch {
+    [System.IO.File]::WriteAllText($env:YI_PICK_OUT + '.err', $_.Exception.Message, (New-Object System.Text.UTF8Encoding($false)))
+}
+"""
+
+
+def _display_path(path: Path) -> str:
+    """Prefer a relative path for files inside the app folder."""
+    try:
+        return str(path.resolve().relative_to(APP_DIR.resolve()))
+    except Exception:
+        return str(path)
+
+
+def _initial_picker_directory(initial: str) -> str:
+    """Resolve the starting folder for the native dialog."""
+    if not initial:
+        return str(APP_DIR)
+    candidate = Path(initial)
+    if not candidate.is_absolute():
+        candidate = APP_DIR / candidate
+    try:
+        if candidate.is_dir():
+            return str(candidate)
+        if candidate.parent.exists():
+            return str(candidate.parent)
+    except OSError:
+        pass
+    return str(APP_DIR)
+
+
+def _pick_path_windows(mode: str, initial: str, title: str, file_filter: str) -> Dict[str, object]:
+    out_fd, out_name = tempfile.mkstemp(prefix="yi-pick-", suffix=".txt")
+    os.close(out_fd)
+    out_path = Path(out_name)
+    err_path = Path(out_name + ".err")
+    try:
+        env = os.environ.copy()
+        env.update(
+            {
+                "YI_PICK_OUT": str(out_path),
+                "YI_PICK_MODE": "dir" if mode == "dir" else "file",
+                "YI_PICK_TITLE": title,
+                "YI_PICK_INITIAL": initial,
+                "YI_PICK_FILTER": file_filter,
+            }
+        )
+        encoded = base64.b64encode(_PICKER_PS.encode("utf-16-le")).decode("ascii")
+        flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        subprocess.run(
+            [
+                "powershell.exe",
+                "-NoProfile",
+                "-NonInteractive",
+                "-STA",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-EncodedCommand",
+                encoded,
+            ],
+            env=env,
+            timeout=300,
+            creationflags=flags,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+
+        if err_path.exists():
+            message = err_path.read_text(encoding="utf-8", errors="replace").strip()
+            return {"success": False, "cancelled": False, "error": message or "The native picker failed."}
+        if not out_path.exists():
+            return {"success": False, "cancelled": True, "error": ""}
+
+        selected = out_path.read_text(encoding="utf-8", errors="replace").strip()
+        if not selected:
+            return {"success": False, "cancelled": True, "error": ""}
+        return {"success": True, "cancelled": False, "path": _display_path(Path(selected)), "error": ""}
+    finally:
+        for path in (out_path, err_path):
+            try:
+                path.unlink()
+            except OSError:
+                pass
+
+
+@app.post("/api/pick-path")
+def pick_path(req: PickPathRequest):
+    """Open the native Windows file or folder dialog on this machine."""
+    if sys.platform != "win32":
+        return {"success": False, "cancelled": False, "error": "The native path picker is only available on Windows."}
+
+    mode = "dir" if req.mode.strip().lower() in ("dir", "folder", "directory") else "file"
+    title = req.title.strip() or ("Select a folder" if mode == "dir" else "Select a file")
+    file_filter = req.filter.strip() or "All files (*.*)|*.*"
+    try:
+        return _pick_path_windows(mode, _initial_picker_directory(req.initial.strip()), title, file_filter)
+    except subprocess.TimeoutExpired:
+        return {"success": False, "cancelled": False, "error": "The file picker timed out."}
+    except Exception as exc:
+        logger.exception("Native path picker failed")
+        return {"success": False, "cancelled": False, "error": str(exc)}
 
 
 @app.get("/api/screenshots")

@@ -257,6 +257,7 @@
       white-space: nowrap;
     }
     .pill-brand { color: var(--brand); background: var(--brand-soft); border-color: var(--brand-border); }
+    .pill-warn { color: var(--warning); background: var(--warning-soft); border-color: var(--warning); }
 
     /* ---------------- Progress ---------------- */
     .progress-card { padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
@@ -299,8 +300,9 @@
     .input:hover { border-color: var(--border-strong); }
     .input:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft); background: var(--bg-elev); }
     .input::placeholder { color: var(--text-faint); }
-    .input-row { display: flex; gap: 8px; }
+    .input-row { display: flex; align-items: center; gap: 8px; }
     .input-row .input { flex: 1; min-width: 0; }
+    .browse-btn { flex: none; }
 
     .segmented { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 4px; background: var(--bg-soft); border: 1px solid var(--border); border-radius: 12px; }
     .segment {
@@ -509,6 +511,56 @@
     .shot-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .empty-state { grid-column: 1 / -1; text-align: center; padding: 40px 12px; color: var(--text-faint); font-size: 12.5px; border: 1px dashed var(--border); border-radius: 12px; }
 
+    /* ---------------- AI assistant ---------------- */
+    .ai-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 16px;
+      overflow: hidden;
+    }
+    .ai-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+    .ai-provider-group { grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 3px; }
+    .ai-provider-group .segment { padding: 7px 12px; font-size: 12px; }
+    .ai-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .ai-status-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 20px; font-size: 11.5px; color: var(--text-muted); }
+    .ai-status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-faint); flex: none; }
+    .ai-status-dot.checking { background: var(--info); animation: pulse 1.1s ease-in-out infinite; }
+    .ai-status-dot.ok { background: var(--success); }
+    .ai-status-dot.blocked { background: var(--warning); }
+    .ai-frame-wrap {
+      position: relative;
+      flex: 1;
+      min-height: 300px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      background: var(--bg-soft);
+    }
+    .ai-frame-wrap iframe { display: block; width: 100%; height: 100%; border: 0; background: #fff; }
+    .ai-blocked {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      padding: 26px 22px;
+      text-align: center;
+      background:
+        radial-gradient(600px 300px at 50% 0%, var(--brand-soft), transparent 70%),
+        var(--bg-soft);
+    }
+    .ai-blocked > .icon { width: 40px; height: 40px; color: var(--warning); }
+    .ai-blocked h4 { margin: 0; font-size: 15px; font-weight: 700; }
+    .ai-blocked p { margin: 0; max-width: 54ch; font-size: 12.5px; line-height: 1.6; color: var(--text-muted); }
+    .ai-blocked code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--brand); font-size: 11px; }
+    .ai-blocked-actions { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+    .ai-link { border: 0; background: none; padding: 0; color: var(--brand); font: inherit; font-size: 11.5px; font-weight: 600; cursor: pointer; }
+    .ai-link:hover { text-decoration: underline; }
+    .ai-hint { margin: 0; }
+
     /* ---------------- Modal & toasts ---------------- */
     .modal { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: 24px; background: rgba(3, 7, 18, 0.78); backdrop-filter: blur(6px); }
     .modal-card { position: relative; max-width: min(1100px, 94vw); max-height: 92vh; background: var(--bg-elev); border: 1px solid var(--border); border-radius: 16px; padding: 10px; box-shadow: var(--shadow-lg); }
@@ -578,6 +630,10 @@
     <symbol id="i-activity" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></symbol>
     <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></symbol>
     <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></symbol>
+    <symbol id="i-external-link" viewBox="0 0 24 24"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></symbol>
+    <symbol id="i-monitor" viewBox="0 0 24 24"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></symbol>
+    <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></symbol>
   </svg>
   <!-- BODY CONTENT -->
   <header class="topbar">
@@ -700,6 +756,9 @@
               <label class="field-label" for="cfgFilePath">Idea catalog file</label>
               <div class="input-row">
                 <input class="input" id="cfgFilePath" value="Idea.md" autocomplete="off" spellcheck="false">
+                <button class="btn btn-ghost btn-sm browse-btn" type="button" onclick="browseCatalogFile()" title="Browse for the catalog file with the Windows file picker">
+                  <svg class="icon"><use href="#i-folder"/></svg> Browse
+                </button>
                 <button class="icon-btn bordered" type="button" onclick="reloadIdeas()" title="Reload catalog" aria-label="Reload catalog">
                   <svg class="icon"><use href="#i-refresh"/></svg>
                 </button>
@@ -747,7 +806,7 @@
                 <svg class="icon"><use href="#i-copy"/></svg> <span id="copyPromptLabel">Copy</span>
               </button>
             </div>
-            <p class="field-hint">Paste into ChatGPT, Claude, or Gemini to generate an exact-fit <code>Idea.md</code>.</p>
+            <p class="field-hint">Paste into ChatGPT, Claude, or Gemini to generate an exact-fit <code>Idea.md</code>. <button type="button" class="ai-link" onclick="switchTab('ai')">Open the AI assistant →</button></p>
           </div>
         </section>
       </div>
@@ -763,6 +822,9 @@
             </button>
             <button type="button" class="tab" id="tabEvidenceBtn" role="tab" aria-selected="false" aria-controls="panelEvidence" onclick="switchTab('evidence')">
               <svg class="icon"><use href="#i-image"/></svg> Evidence
+            </button>
+            <button type="button" class="tab" id="tabAIBtn" role="tab" aria-selected="false" aria-controls="panelAI" onclick="switchTab('ai')">
+              <svg class="icon"><use href="#i-sparkles"/></svg> AI assistant
             </button>
             <div class="tab-actions">
               <button type="button" class="icon-btn" id="clearConsoleBtn" onclick="clearConsole()" title="Clear console" aria-label="Clear console">
@@ -802,6 +864,47 @@
             </div>
             <div class="gallery" id="galleryGrid"></div>
           </div>
+
+          <div class="tab-panel ai-panel hidden" id="panelAI" role="tabpanel" aria-labelledby="tabAIBtn">
+            <div class="ai-head">
+              <div class="segmented ai-provider-group" role="group" aria-label="AI provider">
+                <button type="button" class="segment is-active" data-ai-provider="chatgpt" aria-pressed="true" onclick="setAIProvider('chatgpt')">ChatGPT</button>
+                <button type="button" class="segment" data-ai-provider="gemini" aria-pressed="false" onclick="setAIProvider('gemini')">Gemini</button>
+                <button type="button" class="segment" data-ai-provider="arena" aria-pressed="false" onclick="setAIProvider('arena')">Arena.ai</button>
+              </div>
+              <div class="ai-actions">
+                <button type="button" class="btn btn-primary btn-sm" id="aiOpenWindowBtn" onclick="openAIWindow()">
+                  <svg class="icon"><use href="#i-monitor"/></svg> Open AI window
+                </button>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="openAITab()" title="Open in a normal browser tab" aria-label="Open in a browser tab">
+                  <svg class="icon"><use href="#i-external-link"/></svg>
+                </button>
+              </div>
+            </div>
+            <div class="ai-status-row">
+              <span class="ai-status-dot" id="aiStatusDot"></span>
+              <span id="aiStatusText">Checking embedding support…</span>
+              <span class="pill" id="aiPolicyPill">checking</span>
+              <button type="button" class="ai-link" onclick="checkAIEmbed(true)">Re-check</button>
+            </div>
+            <div class="ai-frame-wrap">
+              <iframe id="aiFrame" title="Embedded AI assistant" src="about:blank" referrerpolicy="no-referrer" allow="clipboard-read; clipboard-write; fullscreen"></iframe>
+              <div class="ai-blocked" id="aiBlocked">
+                <svg class="icon"><use href="#i-shield"/></svg>
+                <h4 id="aiBlockedTitle">Checking embedding policy…</h4>
+                <p id="aiBlockedText">The dashboard checks whether this provider allows being framed.</p>
+                <div class="ai-blocked-actions">
+                  <button type="button" class="btn btn-primary" onclick="openAIWindow()">
+                    <svg class="icon"><use href="#i-monitor"/></svg> Open native AI window
+                  </button>
+                  <button type="button" class="btn btn-ghost" id="aiTryEmbedBtn" onclick="tryEmbedAI()">
+                    <svg class="icon"><use href="#i-globe"/></svg> Try embedding anyway
+                  </button>
+                </div>
+              </div>
+            </div>
+            <p class="field-hint ai-hint">The native window uses a saved local Chrome profile, so sign-in, file uploads and downloads work like a normal browser.</p>
+          </div>
         </section>
       </div>
     </div>
@@ -825,7 +928,7 @@
     'use strict';
 
     const THEME_KEY = 'yi-theme';
-    const state = { participationType: 'Team', currentTab: 'console', sse: null };
+    const state = { participationType: 'Team', currentTab: 'console', sse: null, aiProvider: 'chatgpt', aiChecked: {} };
     const $ = function (id) { return document.getElementById(id); };
 
     /* ---------------- Theme ---------------- */
@@ -864,7 +967,8 @@
     const TABS = {
       console: ['tabConsoleBtn', 'panelConsole'],
       catalog: ['tabCatalogBtn', 'panelCatalog'],
-      evidence: ['tabEvidenceBtn', 'panelEvidence']
+      evidence: ['tabEvidenceBtn', 'panelEvidence'],
+      ai: ['tabAIBtn', 'panelAI']
     };
 
     function switchTab(name) {
@@ -879,6 +983,7 @@
       state.currentTab = name;
       if (name === 'catalog') loadRawCatalog();
       if (name === 'evidence') loadScreenshots();
+      if (name === 'ai') checkAIEmbed(false);
     }
 
     /* ---------------- Configuration ---------------- */
@@ -980,6 +1085,37 @@
     async function reloadIdeas() {
       await loadInitialData();
       showToast('Catalog reloaded.', 'success');
+    }
+
+    async function browseCatalogFile() {
+      const input = $('cfgFilePath');
+      const button = document.querySelector('.browse-btn');
+      if (button) button.disabled = true;
+      try {
+        const res = await fetch('/api/pick-path', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            mode: 'file',
+            initial: input.value.trim(),
+            title: 'Select the idea catalog file',
+            filter: 'Idea catalogs (*.md;*.txt)|*.md;*.txt|Markdown (*.md)|*.md|All files (*.*)|*.*'
+          })
+        });
+        const data = await res.json();
+        if (!data.success) {
+          if (!data.cancelled) showToast(data.error || 'Could not open the native file picker.', 'error');
+          return;
+        }
+        input.value = data.path;
+        await loadInitialData();
+        showToast('Catalog loaded: ' + data.path, 'success');
+      } catch (e) {
+        console.error(e);
+        showToast('The native file picker could not be opened.', 'error');
+      } finally {
+        if (button) button.disabled = false;
+      }
     }
 
     function renderIdeaCards(ideas) {
@@ -1109,6 +1245,133 @@
       label.textContent = copied ? 'Copied!' : 'Copy failed';
       showToast(copied ? 'Prompt copied to clipboard.' : 'Could not copy the prompt.', copied ? 'success' : 'error');
       window.setTimeout(function () { label.textContent = 'Copy'; }, 2000);
+    }
+
+    /* ---------------- AI assistant ---------------- */
+    const AI_PROVIDERS = {
+      chatgpt: { name: 'ChatGPT', url: 'https://chatgpt.com/' },
+      gemini: { name: 'Gemini', url: 'https://gemini.google.com/app' },
+      arena: { name: 'Arena.ai', url: 'https://arena.ai/' }
+    };
+
+    function setAIProvider(provider) {
+      if (!AI_PROVIDERS[provider]) return;
+      state.aiProvider = provider;
+      document.querySelectorAll('[data-ai-provider]').forEach(function (button) {
+        const active = button.dataset.aiProvider === provider;
+        button.classList.toggle('is-active', active);
+        button.setAttribute('aria-pressed', active ? 'true' : 'false');
+      });
+      checkAIEmbed(false);
+    }
+
+    async function checkAIEmbed(force) {
+      const providerKey = state.aiProvider;
+      const provider = AI_PROVIDERS[providerKey];
+      if (!provider) return;
+      if (!force && state.aiChecked[providerKey]) {
+        applyAIEmbedResult(state.aiChecked[providerKey]);
+        return;
+      }
+
+      $('aiStatusDot').className = 'ai-status-dot checking';
+      $('aiStatusText').textContent = 'Checking whether ' + provider.name + ' allows embedding…';
+      $('aiPolicyPill').textContent = 'checking';
+      $('aiPolicyPill').className = 'pill';
+
+      try {
+        const res = await fetch('/api/ai/embed-check?provider=' + encodeURIComponent(providerKey));
+        const data = await res.json();
+        if (state.aiProvider !== providerKey) return;
+        if (!data.success) throw new Error(data.error || 'Provider check failed.');
+        state.aiChecked[providerKey] = data;
+        applyAIEmbedResult(data);
+      } catch (e) {
+        if (state.aiProvider !== providerKey) return;
+        console.error(e);
+        applyAIEmbedResult({
+          embeddable: false,
+          checked: false,
+          reason: 'Could not check the provider policy: ' + e.message
+        });
+      }
+    }
+
+    function applyAIEmbedResult(data) {
+      const meta = AI_PROVIDERS[state.aiProvider];
+      const frame = $('aiFrame');
+      const blocked = $('aiBlocked');
+      const dot = $('aiStatusDot');
+      const pill = $('aiPolicyPill');
+
+      if (data.embeddable) {
+        dot.className = 'ai-status-dot ok';
+        $('aiStatusText').textContent = meta.name + ' can be embedded in this dashboard.';
+        pill.textContent = 'embed allowed';
+        pill.className = 'pill pill-brand';
+        blocked.classList.add('hidden');
+        $('aiTryEmbedBtn').classList.add('hidden');
+        if (frame.dataset.provider !== state.aiProvider) {
+          frame.src = meta.url;
+          frame.dataset.provider = state.aiProvider;
+        }
+      } else {
+        dot.className = 'ai-status-dot blocked';
+        $('aiStatusText').textContent = meta.name + ' blocks iframe embedding.';
+        pill.textContent = 'embed blocked';
+        pill.className = 'pill pill-warn';
+        $('aiBlockedTitle').textContent = meta.name + ' blocks embedding';
+        const reason = (data.reason || 'This provider does not allow being loaded inside another site.').replace(/\s+$/, '');
+        $('aiBlockedText').textContent = reason + (/[.!?]$/.test(reason) ? '' : '.') +
+          ' Use the native AI window to sign in and to upload or download files.';
+        $('aiTryEmbedBtn').classList.remove('hidden');
+        blocked.classList.remove('hidden');
+        frame.src = 'about:blank';
+        frame.dataset.provider = '';
+      }
+    }
+
+    function tryEmbedAI() {
+      const meta = AI_PROVIDERS[state.aiProvider];
+      const frame = $('aiFrame');
+      $('aiBlocked').classList.add('hidden');
+      frame.src = meta.url;
+      frame.dataset.provider = state.aiProvider;
+      $('aiStatusDot').className = 'ai-status-dot blocked';
+      $('aiStatusText').textContent = 'Attempting to load ' + meta.name + ' in the panel…';
+      showToast('If the panel stays blank, ' + meta.name + ' blocked the frame. Use the native AI window.', 'info');
+    }
+
+    async function openAIWindow() {
+      const meta = AI_PROVIDERS[state.aiProvider];
+      const button = $('aiOpenWindowBtn');
+      button.disabled = true;
+      try {
+        const res = await fetch('/api/ai/open', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ provider: state.aiProvider })
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Could not open the AI window.');
+        if (data.mode === 'tab') {
+          showToast('No Chromium browser found — opened ' + meta.name + ' in your browser.', 'info');
+        } else {
+          showToast(meta.name + ' opened in a dedicated ' + data.browser + ' window.', 'success');
+        }
+      } catch (e) {
+        console.error(e);
+        showToast(e.message || 'Could not open the AI window.', 'error');
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    function openAITab() {
+      const meta = AI_PROVIDERS[state.aiProvider];
+      const opened = window.open(meta.url, '_blank');
+      if (opened) opened.opener = null;
+      if (!opened) showToast('The browser blocked the popup. Use the native AI window instead.', 'error');
     }
 
     /* ---------------- Live status & logs ---------------- */
