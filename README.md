@@ -3,7 +3,7 @@
 A lightweight Windows installer for a local dashboard that batch-submits ideas to the [Youth Ideathon portal](https://youthideathon.in/submit-your-idea/) with live logs, an ETA, and screenshot proof.
 
 <p align="center">
-  <a href="https://github.com/rKyzen/Youth-Ideathon-Bot/releases/download/v1_exe/YouthIdeathon_Setup_v2.1.0.exe">
+  <a href="https://github.com/rKyzen/Youth-Ideathon-Bot/releases/download/v2.1.0/YouthIdeathon_Setup_v2.1.0.exe">
     <img src="https://img.shields.io/badge/Download-Installer_v2.1.0-f97316?style=for-the-badge&logo=windows&logoColor=white" alt="Download the installer">
   </a>
   <a href="https://github.com/rKyzen/Youth-Ideathon-Bot/releases">
