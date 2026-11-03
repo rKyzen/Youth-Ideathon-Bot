@@ -21,7 +21,6 @@ import subprocess
 import sys
 import tempfile
 import threading
-import urllib.error
 import urllib.request
 import webbrowser
 from datetime import datetime, timedelta
@@ -262,197 +261,165 @@ Every idea MUST adhere strictly to the following markdown template:
 
 
 # ---------------------------------------------------------------------------
-# AI assistant: embedded-frame policy check + dedicated Chromium window
+# Automated AI generation (Playwright-driven)
 # ---------------------------------------------------------------------------
 
-AI_PROVIDERS: Dict[str, Dict[str, str]] = {
-    "chatgpt": {"name": "ChatGPT", "url": "https://chatgpt.com/"},
-    "gemini": {"name": "Gemini", "url": "https://gemini.google.com/app"},
-    "arena": {"name": "Arena.ai", "url": "https://arena.ai/"},
+class AIGenerateRequest(BaseModel):
+    prompt: str
+    provider: str = "chatgpt"  # chatgpt, gemini, arena
+    timeout_seconds: int = 180
+
+
+AI_AUTOMATION_CONFIG = {
+    "chatgpt": {
+        "url": "https://chatgpt.com/",
+        "textarea_selector": "textarea#prompt-textarea, div[contenteditable='true'][data-testid='textbox'], textarea[data-id='root']",
+        "submit_selector": "button[data-testid='send-button'], button[aria-label='Send message']",
+        "response_selector": "div[data-message-author-role='assistant'], .markdown.prose, .group.w-full",
+        "wait_for_login": True,
+    },
+    "gemini": {
+        "url": "https://gemini.google.com/app",
+        "textarea_selector": "textarea[aria-label='Enter a prompt here'], div[contenteditable='true'][role='textbox']",
+        "submit_selector": "button[aria-label='Send message'], button[data-testid='send-button']",
+        "response_selector": "div[data-message-author='model'], .model-response-text",
+        "wait_for_login": True,
+    },
+    "arena": {
+        "url": "https://arena.ai/",
+        "textarea_selector": "textarea, div[contenteditable='true']",
+        "submit_selector": "button[type='submit'], button:has-text('Send')",
+        "response_selector": ".response, .message.assistant",
+        "wait_for_login": False,
+    },
 }
 
-_BROWSER_UA = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
-)
 
+async def run_ai_automation(prompt: str, provider: str, timeout_seconds: int) -> Dict[str, object]:
+    """Run Playwright automation to send prompt to AI and extract response."""
+    config = AI_AUTOMATION_CONFIG.get(provider.lower())
+    if not config:
+        return {"success": False, "error": f"Unknown provider: {provider}"}
 
-def _frame_policy(url: str) -> Dict[str, object]:
-    """Return whether ``url`` may be embedded in this localhost dashboard."""
-    request = urllib.request.Request(
-        url,
-        headers={"User-Agent": _BROWSER_UA, "Accept": "text/html,application/xhtml+xml"},
-    )
-    xfo = ""
-    csp = ""
-    checked = True
     try:
-        with urllib.request.urlopen(request, timeout=10) as response:
-            xfo = response.headers.get("X-Frame-Options", "") or ""
-            csp = " ; ".join(response.headers.get_all("Content-Security-Policy") or [])
-    except urllib.error.HTTPError as exc:
-        headers = exc.headers
-        xfo = (headers.get("X-Frame-Options", "") if headers else "") or ""
-        csp = " ; ".join((headers.get_all("Content-Security-Policy") if headers else []) or [])
-        if not xfo and not csp:
-            checked = False
-    except Exception as exc:
-        return {"embeddable": False, "checked": False, "reason": f"Could not verify the provider policy ({exc})."}
+        from playwright.async_api import async_playwright
+    except ImportError:
+        return {"success": False, "error": "Playwright not installed. Run 'pip install playwright' and 'playwright install chromium'."}
 
-    xfo_lower = xfo.lower()
-    if "deny" in xfo_lower:
-        return {"embeddable": False, "checked": checked, "reason": f"X-Frame-Options: {xfo.split(',')[0].strip()}"}
-    if "sameorigin" in xfo_lower:
-        return {"embeddable": False, "checked": checked, "reason": f"X-Frame-Options: {xfo.split(',')[0].strip()}"}
-    if "allow-from" in xfo_lower:
-        # Obsolete and ignored (blocked) by modern browsers.
-        return {"embeddable": False, "checked": checked, "reason": f"X-Frame-Options: {xfo.split(',')[0].strip()}"}
+    user_data_dir = APP_DIR / "ai_automation_profile" / provider.lower()
+    user_data_dir.mkdir(parents=True, exist_ok=True)
 
-    directive = ""
-    for part in csp.split(";"):
-        if part.strip().lower().startswith("frame-ancestors"):
-            directive = part.strip()
-            break
+    browser = None
+    context = None
+    try:
+        async with async_playwright() as p:
+            browser = await p.chromium.launch_persistent_context(
+                user_data_dir=str(user_data_dir),
+                headless=False,
+                args=[
+                    "--disable-blink-features=AutomationControlled",
+                    "--no-first-run",
+                    "--no-default-browser-check",
+                ],
+                viewport={"width": 1280, "height": 960},
+            )
+            context = browser
+            page = context.pages[0] if context.pages else await context.new_page()
 
-    if directive:
-        tokens = [token.strip() for token in directive.lower().split()[1:]]
-        allowed = "'none'" not in tokens and (
-            "*" in tokens
-            or "http:" in tokens
-            or "https:" in tokens
-            or any("localhost" in token or "127.0.0.1" in token for token in tokens)
-        )
-        if not allowed:
-            return {"embeddable": False, "checked": checked, "reason": directive}
+            # Navigate to AI site
+            await page.goto(config["url"], wait_until="domcontentloaded", timeout=60000)
 
-    return {"embeddable": True, "checked": checked, "reason": ""}
+            # Wait for login if needed
+            if config.get("wait_for_login"):
+                # Wait for the chat interface to be ready (textarea visible)
+                try:
+                    await page.wait_for_selector(config["textarea_selector"], state="visible", timeout=120000)
+                except Exception:
+                    return {"success": False, "error": f"Login required or chat interface not found for {provider}. Please log in manually first."}
+
+            # Fill the prompt
+            textarea = await page.wait_for_selector(config["textarea_selector"], state="visible", timeout=30000)
+            await textarea.fill(prompt)
+
+            # Submit
+            submit_btn = await page.wait_for_selector(config["submit_selector"], state="visible", timeout=10000)
+            await submit_btn.click()
+
+            # Wait for response - look for the assistant message to appear and stop streaming
+            response_text = ""
+            start_time = asyncio.get_event_loop().time()
+            last_length = 0
+            stable_count = 0
+
+            while asyncio.get_event_loop().time() - start_time < timeout_seconds:
+                try:
+                    # Get all assistant messages
+                    responses = await page.query_selector_all(config["response_selector"])
+                    if responses:
+                        # Get the last (most recent) response
+                        last_response = responses[-1]
+                        text = await last_response.inner_text()
+                        if text and len(text) > len(prompt):  # Has actual response
+                            if len(text) == last_length:
+                                stable_count += 1
+                                if stable_count >= 3:  # Response stable for 3 checks
+                                    response_text = text
+                                    break
+                            else:
+                                stable_count = 0
+                                last_length = len(text)
+                except Exception:
+                    pass
+                await asyncio.sleep(2)
+
+            if not response_text:
+                return {"success": False, "error": f"Timeout waiting for {provider} response."}
+
+            # Extract markdown code blocks or use full response
+            import re
+            markdown_blocks = re.findall(r'```(?:markdown|md)?\n(.*?)```', response_text, re.DOTALL)
+            if markdown_blocks:
+                extracted = markdown_blocks[0].strip()
+            else:
+                # Try to find the Idea.md content pattern
+                idea_match = re.search(r'(### IDEA-\d+:.*?)(?=### IDEA-\d+:|\Z)', response_text, re.DOTALL)
+                if idea_match:
+                    extracted = idea_match.group(1).strip()
+                else:
+                    extracted = response_text.strip()
+
+            return {"success": True, "content": extracted, "raw_response": response_text}
+
+    except Exception as e:
+        logger.exception("AI automation failed")
+        return {"success": False, "error": f"Automation error: {e}"}
+    finally:
+        if context:
+            try:
+                await context.close()
+            except Exception:
+                pass
 
 
-def _chromium_candidates() -> List[tuple]:
-    """Return installed Chromium-based browsers, most preferred first."""
-    env = os.environ
-    candidates = []
+@app.post("/api/ai/generate")
+async def ai_generate(req: AIGenerateRequest):
+    """Automate AI to generate Idea.md content from prompt."""
+    if not req.prompt.strip():
+        return {"success": False, "error": "Prompt is empty."}
 
-    for base, label in (
-        (env.get("PROGRAMFILES"), "chrome"),
-        (env.get("PROGRAMFILES(X86)"), "chrome"),
-        (env.get("LOCALAPPDATA"), "chrome"),
-    ):
-        if base:
-            candidates.append((Path(base) / "Google" / "Chrome" / "Application" / "chrome.exe", label))
-
-    for base in (env.get("PROGRAMFILES(X86)"), env.get("PROGRAMFILES"), env.get("LOCALAPPDATA")):
-        if base:
-            candidates.append((Path(base) / "Microsoft" / "Edge" / "Application" / "msedge.exe", "edge"))
-
-    local = env.get("LOCALAPPDATA")
-    if local:
-        playwright_root = Path(local) / "ms-playwright"
-        if playwright_root.exists():
-            for pattern in ("chromium-*/chrome-win/chrome.exe", "chromium-*/chrome-win64/chrome.exe"):
-                for exe in sorted(playwright_root.glob(pattern), reverse=True):
-                    candidates.append((exe, "chromium"))
-
-    seen = set()
-    found = []
-    for path, label in candidates:
-        key = str(path).lower()
-        if key in seen:
-            continue
-        seen.add(key)
-        try:
-            if path.is_file():
-                found.append((path, label))
-        except OSError:
-            continue
-    return found
+    result = await run_ai_automation(req.prompt.strip(), req.provider, req.timeout_seconds)
+    return result
 
 
-class AIProviderRequest(BaseModel):
-    provider: str = "chatgpt"
-
+# ---------------------------------------------------------------------------
+# Native file / folder picker (Windows common dialogs)
+# ---------------------------------------------------------------------------
 
 class PickPathRequest(BaseModel):
     mode: str = "file"
     initial: str = ""
     title: str = "Select a file"
     filter: str = ""
-
-
-@app.get("/api/ai/embed-check")
-def ai_embed_check(provider: str = "chatgpt"):
-    """Report whether the selected AI provider permits iframe embedding."""
-    key = provider.strip().lower()
-    meta = AI_PROVIDERS.get(key)
-    if not meta:
-        return {"success": False, "error": "Unknown AI provider."}
-    policy = _frame_policy(meta["url"])
-    return {"success": True, "provider": key, "name": meta["name"], "url": meta["url"], **policy}
-
-
-@app.post("/api/ai/open")
-def ai_open_window(req: AIProviderRequest):
-    """Open the provider in a dedicated Chromium app window with a saved profile."""
-    key = req.provider.strip().lower()
-    meta = AI_PROVIDERS.get(key)
-    if not meta:
-        return {"success": False, "error": "Unknown AI provider."}
-
-    url = meta["url"]
-    candidates = _chromium_candidates()
-    if not candidates:
-        try:
-            webbrowser.open(url, new=2)
-            return {
-                "success": True,
-                "mode": "tab",
-                "browser": "default",
-                "url": url,
-                "message": "No Chromium browser found; opened in the default browser.",
-            }
-        except Exception as exc:
-            return {"success": False, "error": f"Could not open a browser: {exc}"}
-
-    exe, label = candidates[0]
-    profile_root = APP_DIR / "ai_window_profile" / label
-    try:
-        profile_root.mkdir(parents=True, exist_ok=True)
-    except OSError:
-        profile_root = Path(tempfile.gettempdir()) / "youth-ideathon-ai" / label
-        profile_root.mkdir(parents=True, exist_ok=True)
-
-    args = [
-        str(exe),
-        f"--app={url}",
-        f"--user-data-dir={profile_root}",
-        "--window-size=1280,960",
-        "--no-first-run",
-        "--no-default-browser-check",
-        "--hide-crash-restore-bubble",
-    ]
-    creationflags = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(
-        subprocess, "CREATE_NEW_PROCESS_GROUP", 0
-    )
-    try:
-        subprocess.Popen(
-            args,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            close_fds=True,
-            creationflags=creationflags,
-        )
-    except Exception as exc:
-        logger.exception("Could not launch the AI window")
-        return {"success": False, "error": f"Could not launch {label}: {exc}"}
-
-    return {
-        "success": True,
-        "mode": "app",
-        "browser": label,
-        "url": url,
-        "profile": str(profile_root),
-    }
 
 
 # ---------------------------------------------------------------------------

@@ -1,6 +1,5 @@
 # Chrome user profile session data
 chrome_user_data/
-ai_window_profile/
 
 # Python cache
 __pycache__/
