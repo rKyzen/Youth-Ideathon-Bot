@@ -9,6 +9,11 @@ __pycache__/
 # Runtime logs
 automation.log
 
+# Build artifacts
+build/
+dist/
+icon.png
+
 # Temporary / OS files
 .DS_Store
 Thumbs.db

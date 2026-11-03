@@ -20,6 +20,16 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional, Set
 
+# Safe input function for handling lost stdin (e.g., PyInstaller EXE)
+def safe_input(prompt: str, default: str = "") -> str:
+    """Safe input function that handles lost or redirected stdin gracefully."""
+    try:
+        if sys.stdin is None or not sys.stdin.isatty():
+            return default
+        return input(prompt).strip()
+    except (EOFError, RuntimeError, AttributeError, OSError):
+        return default
+
 from playwright.async_api import BrowserContext, Page, async_playwright
 
 # Ensure UTF-8 output encoding across Windows consoles
@@ -49,6 +59,27 @@ TARGET_URL = "https://youthideathon.in/submit-your-idea/"
 LOG_CSV_FILE = "submission_log.csv"
 SCREENSHOTS_DIR = "screenshots"
 USER_DATA_DIR = "chrome_user_data"
+
+
+def chrome_channel() -> Optional[str]:
+    """Return "chrome" when Google Chrome is installed, else None.
+
+    When Chrome is absent Playwright's bundled Chromium is used, which the
+    installer provisions automatically. Passing channel=None lets Playwright
+    pick its own browser instead of failing on a missing Chrome install.
+    """
+    candidates = [
+        Path(os.environ.get("PROGRAMFILES", r"C:\Program Files")) / "Google/Chrome/Application/chrome.exe",
+        Path(os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)")) / "Google/Chrome/Application/chrome.exe",
+        Path(os.environ.get("LOCALAPPDATA", "")) / "Google/Chrome/Application/chrome.exe",
+    ]
+    for candidate in candidates:
+        try:
+            if candidate.exists():
+                return "chrome"
+        except OSError:
+            continue
+    return None
 
 
 def format_duration(seconds: float) -> str:
@@ -394,17 +425,26 @@ async def fill_form_for_idea(
 
     # 4. Teammate SIDs (if Team)
     if part_type == "Team":
-        t1_sid = config.get("teammate_1_sid", "")
-        t2_sid = config.get("teammate_2_sid", "")
-        logger.info(f"Step 4: Entering Teammate SIDs: T1 (SID 2)='{t1_sid}', T2 (SID 3)='{t2_sid}'")
-        if t1_sid:
-            t1_input = page.locator("#teammate-1-sid")
-            await t1_input.fill(t1_sid)
-            await human_delay(input_delay_min, input_delay_max)
-
-        if t2_sid:
-            t2_input = page.locator("#teammate-2-sid")
-            await t2_input.fill(t2_sid)
+        teammate_fields = [
+            ("SID 2", "teammate_1_sid", "#teammate-1-sid"),
+            ("SID 3", "teammate_2_sid", "#teammate-2-sid"),
+            ("SID 4", "teammate_3_sid", "#teammate-3-sid"),
+            ("SID 5", "teammate_4_sid", "#teammate-4-sid"),
+        ]
+        logger.info(
+            "Step 4: Entering Teammate SIDs: "
+            + ", ".join(f"{label}='{config.get(key, '')}'" for label, key, _ in teammate_fields)
+        )
+        for label, key, selector in teammate_fields:
+            sid_value = config.get(key, "")
+            if not sid_value:
+                continue
+            field = page.locator(selector)
+            # Some portal versions may not expose every teammate slot; skip missing ones
+            if await field.count() == 0:
+                logger.warning(f"Teammate field {selector} ({label}) not found on page; skipping.")
+                continue
+            await field.fill(sid_value)
             await human_delay(input_delay_min, input_delay_max)
 
     # 5. Idea Origin: Where did you get this idea?
@@ -600,6 +640,8 @@ def prompt_user_configuration(args: argparse.Namespace) -> Dict:
             "mentor_target": args.mentor or "Umesh Verma (ATL)",
             "teammate_1_sid": args.sid_2 or "YI26-08461",
             "teammate_2_sid": args.sid_3 or "YI26-09892",
+            "teammate_3_sid": args.sid_4 or "YI26-10123",
+            "teammate_4_sid": args.sid_5 or "YI26-11567",
             "data_file": args.data_file or "Idea.md",
             "awards": [],
             "agreement": True,
@@ -612,7 +654,7 @@ def prompt_user_configuration(args: argparse.Namespace) -> Dict:
 
     # 1. Team or Individual
     default_type = args.participation_type or "Team"
-    raw_type = input(f"1. Participation Type (Team / Individual) [{default_type}]: ").strip()
+    raw_type = safe_input(f"1. Participation Type (Team / Individual) [{default_type}]: ")
     if not raw_type:
         part_type = default_type
     elif raw_type.lower().startswith("i"):
@@ -622,24 +664,34 @@ def prompt_user_configuration(args: argparse.Namespace) -> Dict:
 
     # 2. SID 1 (Primary SID)
     default_sid1 = args.primary_sid or "YI26-11860"
-    raw_sid1 = input(f"2. SID 1 (Primary Student ID) [{default_sid1}]: ").strip()
+    raw_sid1 = safe_input(f"2. SID 1 (Primary Student ID) [{default_sid1}]: ")
     primary_sid = raw_sid1 if raw_sid1 else default_sid1
 
     # 3. Teammate SIDs (if Team)
     t1_sid = ""
     t2_sid = ""
+    t3_sid = ""  # SID 4 (Teammate 3)
+    t4_sid = ""  # SID 5 (Teammate 4)
     if part_type == "Team":
         default_sid2 = args.sid_2 or "YI26-08461"
-        raw_sid2 = input(f"3. SID 2 (Teammate 1 SID) [{default_sid2}]: ").strip()
+        raw_sid2 = safe_input(f"3. SID 2 (Teammate 1 SID) [{default_sid2}]: ")
         t1_sid = raw_sid2 if raw_sid2 else default_sid2
 
         default_sid3 = args.sid_3 or "YI26-09892"
-        raw_sid3 = input(f"4. SID 3 (Teammate 2 SID) [{default_sid3}]: ").strip()
+        raw_sid3 = safe_input(f"4. SID 3 (Teammate 2 SID) [{default_sid3}]: ")
         t2_sid = raw_sid3 if raw_sid3 else default_sid3
+
+        default_sid4 = args.sid_4 or "YI26-10123"
+        raw_sid4 = safe_input(f"5. SID 4 (Teammate 3 SID) [{default_sid4}]: ")
+        t3_sid = raw_sid4 if raw_sid4 else default_sid4
+
+        default_sid5 = args.sid_5 or "YI26-11567"
+        raw_sid5 = safe_input(f"6. SID 5 (Teammate 4 SID) [{default_sid5}]: ")
+        t4_sid = raw_sid5 if raw_sid5 else default_sid5
 
     # 4. Mentor (exact detail)
     default_mentor = args.mentor or "Umesh Verma (ATL)"
-    raw_mentor = input(f"5. Mentor Name (exact detail, e.g. Name (Stream)) [{default_mentor}]: ").strip()
+    raw_mentor = safe_input(f"7. Mentor Name (exact detail, e.g. Name (Stream)) [{default_mentor}]: ").strip()
     mentor_target = raw_mentor if raw_mentor else default_mentor
 
     # 5. Type of ideas: Electronic, Software, or Mix
@@ -648,7 +700,7 @@ def prompt_user_configuration(args: argparse.Namespace) -> Dict:
     print("  [1] Electronic / Hardware / IoT")
     print("  [2] Software / AI / Mobile / Web")
     print("  [3] Mixed (Hardware + Software / DeepTech)")
-    type_choice = input("Select idea type [1/2/3] (default: 3): ").strip()
+    type_choice = safe_input("Select idea type [1/2/3] (default: 3): ", "3")
     type_map = {
         "1": "Electronic & Hardware Innovation (Sensors, Microcontrollers, IoT, Embedded Systems)",
         "2": "Software & AI Solutions (Web apps, Mobile applications, Machine Learning, Cloud)",
@@ -663,13 +715,16 @@ def prompt_user_configuration(args: argparse.Namespace) -> Dict:
     default_file = args.data_file or "Idea.md"
     chosen_file = default_file
     while True:
-        raw_file = input(f"6. Locate your idea file path [{chosen_file}]: ").strip()
+        raw_file = safe_input(f"6. Locate your idea file path [{chosen_file}]: ", chosen_file)
         test_path = raw_file if raw_file else chosen_file
         if Path(test_path).exists():
             chosen_file = test_path
             break
         else:
             print(f"File '{test_path}' not found on disk. Please enter a valid relative or absolute path.")
+            # Avoid infinite loop when stdin is unavailable/redirected
+            if sys.stdin is None or not sys.stdin.isatty():
+                break
 
     config = {
         "participation_type": part_type,
@@ -677,6 +732,8 @@ def prompt_user_configuration(args: argparse.Namespace) -> Dict:
         "mentor_target": mentor_target,
         "teammate_1_sid": t1_sid,
         "teammate_2_sid": t2_sid,
+        "teammate_3_sid": t3_sid,
+        "teammate_4_sid": t4_sid,
         "data_file": chosen_file,
         "awards": [],
         "agreement": True,
@@ -688,6 +745,8 @@ def prompt_user_configuration(args: argparse.Namespace) -> Dict:
     if part_type == "Team":
         print(f"Teammate 1 (SID 2) : {config['teammate_1_sid']}")
         print(f"Teammate 2 (SID 3) : {config['teammate_2_sid']}")
+        print(f"Teammate 3 (SID 4) : {config['teammate_3_sid']}")
+        print(f"Teammate 4 (SID 5) : {config['teammate_4_sid']}")
     print(f"Mentor (Exact)     : {config['mentor_target']}")
     print(f"Idea Catalog File  : {config['data_file']}")
     print("=" * 62 + "\n")
@@ -741,7 +800,7 @@ async def run_automation(args: argparse.Namespace):
         logger.info(f"Launching persistent Chrome context (headless={args.headless})...")
         context = await p.chromium.launch_persistent_context(
             user_data_dir=user_data_path,
-            channel="chrome",
+            channel=chrome_channel(),
             headless=args.headless,
             args=[
                 "--disable-blink-features=AutomationControlled",
@@ -899,6 +958,18 @@ def parse_arguments():
         type=str,
         default=None,
         help="Teammate 2 SID (SID 3)"
+    )
+    parser.add_argument(
+        "--sid-4",
+        type=str,
+        default=None,
+        help="Teammate 3 SID (SID 4)"
+    )
+    parser.add_argument(
+        "--sid-5",
+        type=str,
+        default=None,
+        help="Teammate 4 SID (SID 5)"
     )
     parser.add_argument(
         "--mentor",

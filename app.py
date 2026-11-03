@@ -14,12 +14,35 @@ import json
 import logging
 import os
 import random
+import shutil
+import socket
 import sys
 import threading
+import urllib.request
 import webbrowser
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional, Set
+
+# In PyInstaller --windowed builds sys.stdin/stdout/stderr can be None.
+# Replace them with devnull streams before importing/initialising libraries
+# that inspect them (uvicorn calls sys.stdout.isatty() during logging setup,
+# which crashes a windowed EXE silently).
+if sys.stdin is None:
+    sys.stdin = open(os.devnull, "r", encoding="utf-8", errors="replace")
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, "w", encoding="utf-8", errors="replace")
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, "w", encoding="utf-8", errors="replace")
+
+# For frozen builds, run from the EXE folder before importing the submission
+# module, so its log file and screenshot/profile paths resolve next to the EXE
+# regardless of the working directory Explorer/shortcuts start us in.
+if getattr(sys, "frozen", False):
+    try:
+        os.chdir(Path(sys.executable).resolve().parent)
+    except Exception:
+        pass
 
 import uvicorn
 from fastapi import FastAPI, Request
@@ -33,6 +56,7 @@ from submit_ideas import (
     LOG_CSV_FILE,
     SCREENSHOTS_DIR,
     USER_DATA_DIR,
+    chrome_channel,
     fill_form_for_idea,
     format_duration,
     get_successful_idea_ids,
@@ -52,12 +76,45 @@ if sys.platform == "win32":
     except Exception:
         pass
 
+def _app_base_dir() -> Path:
+    """Directory where runtime files (logs, screenshots, profile) are written."""
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parent
+
+
+def _resource_dir() -> Path:
+    """Directory containing bundled read-only resources (templates)."""
+    return Path(getattr(sys, "_MEIPASS", _app_base_dir()))
+
+
+APP_DIR = _app_base_dir()
+RESOURCE_DIR = _resource_dir()
+
+# Run with the app folder as working directory so relative runtime paths
+# (screenshots, logs, chrome profile) resolve correctly in the frozen EXE.
+try:
+    os.chdir(APP_DIR)
+except Exception:
+    pass
+
 # Ensure directories exist
 Path(SCREENSHOTS_DIR).mkdir(parents=True, exist_ok=True)
-Path("templates").mkdir(parents=True, exist_ok=True)
+(RESOURCE_DIR / "templates").mkdir(parents=True, exist_ok=True)
+
+# On first run from a fresh folder, materialise the bundled catalog files next
+# to the EXE so relative reads/writes (Idea.md, ideas.json, ideas.csv) work.
+for _data_name in ("Idea.md", "ideas.json", "ideas.csv"):
+    _src = RESOURCE_DIR / _data_name
+    _dest = APP_DIR / _data_name
+    if _src.exists() and _src.resolve() != _dest.resolve() and not _dest.exists():
+        try:
+            shutil.copy2(_src, _dest)
+        except Exception:
+            pass
 
 app = FastAPI(title="Youth Ideathon Automation Console")
-templates = Jinja2Templates(directory="templates")
+templates = Jinja2Templates(directory=str(RESOURCE_DIR / "templates"))
 app.mount("/screenshots", StaticFiles(directory=SCREENSHOTS_DIR), name="screenshots")
 
 # SSE Subscriber Queues
@@ -115,6 +172,8 @@ class StartRequest(BaseModel):
     primary_sid: str = "YI26-11860"
     teammate_1_sid: str = "YI26-08461"
     teammate_2_sid: str = "YI26-09892"
+    teammate_3_sid: str = "YI26-10123"
+    teammate_4_sid: str = "YI26-11567"
     mentor_target: str = "Umesh Verma (ATL)"
     data_file: str = "Idea.md"
     dry_run: bool = False
@@ -275,6 +334,8 @@ async def run_submission_process(req: StartRequest):
         "primary_sid": req.primary_sid,
         "teammate_1_sid": req.teammate_1_sid,
         "teammate_2_sid": req.teammate_2_sid,
+        "teammate_3_sid": req.teammate_3_sid,
+        "teammate_4_sid": req.teammate_4_sid,
         "mentor_target": req.mentor_target,
         "awards": [],
         "agreement": True,
@@ -286,7 +347,7 @@ async def run_submission_process(req: StartRequest):
         async with async_playwright() as p:
             context = await p.chromium.launch_persistent_context(
                 user_data_dir=user_data_path,
-                channel="chrome",
+                channel=chrome_channel(),
                 headless=False,
                 args=["--disable-blink-features=AutomationControlled", "--start-maximized"],
                 ignore_default_args=["--enable-automation"],
@@ -367,8 +428,42 @@ async def stop_submission():
     return {"success": False, "message": "No active task running."}
 
 
+def _port_in_use(port: int) -> bool:
+    """Return True when something is listening on 127.0.0.1:<port>."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.settimeout(0.5)
+        return sock.connect_ex(("127.0.0.1", port)) == 0
+
+
+def _is_existing_dashboard(port: int) -> bool:
+    """Return True when an instance of this dashboard is already running."""
+    try:
+        with urllib.request.urlopen(
+            f"http://127.0.0.1:{port}/api/status", timeout=0.8
+        ) as response:
+            return response.status == 200
+    except Exception:
+        return False
+
+
 def start_server(port: int = 8000, open_browser: bool = True):
     """Starts local Uvicorn server and automatically opens localhost dashboard."""
+    # Double-clicking the app again should focus the running dashboard rather
+    # than silently failing because the port is already bound.
+    if _is_existing_dashboard(port):
+        print(f"\n  Youth Ideathon dashboard is already running on http://localhost:{port}\n")
+        if open_browser:
+            webbrowser.open(f"http://localhost:{port}")
+        return
+
+    # If another program owns the default port, use the next free one.
+    original_port = port
+    while _port_in_use(port):
+        port += 1
+        if port > original_port + 20:
+            print("\n  No free local port found (8000-8020). Close other apps and retry.\n")
+            return
+
     url = f"http://localhost:{port}"
     print(f"\n========================================================")
     print(f"  🚀 Youth Ideathon Web GUI Running on {url}")
